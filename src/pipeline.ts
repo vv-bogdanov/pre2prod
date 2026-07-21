@@ -536,14 +536,15 @@ export class Pre2prodPipeline {
     action = "running",
   ): Promise<T> {
     const startedAt = Date.now();
+    const turnLabel = `${context.threadRole}/${context.phaseTurn} ${context.phaseId}#${context.phaseIteration}`;
     this.#reporter.waiting(
-      `${context.threadRole}/${context.phaseTurn} started: ${action} (phase ${context.phaseIndex}, iteration ${context.phaseIteration})`,
+      `${turnLabel} started: ${action}`,
     );
 
     const timer = setInterval(() => {
       const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
       this.#reporter.waiting(
-        `${context.threadRole}/${context.phaseTurn} running (${elapsedSeconds}s)`,
+        `${turnLabel} running (${elapsedSeconds}s)`,
       );
       this.#logger.log("debug", "pipeline.turn.waiting", {
         ...this.#buildLogContext(context),
