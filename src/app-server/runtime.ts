@@ -78,6 +78,7 @@ export class AppServerRuntime implements AgentRuntime {
     string,
     { method: string; params: unknown }[]
   >();
+  readonly #earlyGoalUpdates = new Map<string, unknown>();
   #initialized = false;
   #unsubscribe: (() => void) | undefined;
   #unsubscribeFailure: (() => void) | undefined;
@@ -242,6 +243,12 @@ export class AppServerRuntime implements AgentRuntime {
       }
     }
 
+    const earlyGoalUpdate = this.#earlyGoalUpdates.get(request.threadId);
+    if (earlyGoalUpdate !== undefined) {
+      this.#earlyGoalUpdates.delete(request.threadId);
+      this.#applyGoalUpdated(earlyGoalUpdate);
+    }
+
     return await result;
   }
 
@@ -301,6 +308,7 @@ export class AppServerRuntime implements AgentRuntime {
   async #close(): Promise<void> {
     this.#logger?.log("debug", "runtime.close.start");
     this.#failActiveTurns(new TurnFailedError("App Server runtime closed"));
+    this.#earlyGoalUpdates.clear();
     this.#unsubscribe?.();
     this.#unsubscribeFailure?.();
     await this.#client.close();
@@ -309,7 +317,12 @@ export class AppServerRuntime implements AgentRuntime {
 
   #onNotification(method: string, params: unknown): void {
     if (method === "thread/goal/updated") {
-      this.#applyNotification(method, params);
+      if (!this.#applyGoalUpdated(params)) {
+        const threadId = getString(params, "threadId");
+        if (threadId) {
+          this.#earlyGoalUpdates.set(threadId, params);
+        }
+      }
       return;
     }
 
@@ -537,12 +550,12 @@ export class AppServerRuntime implements AgentRuntime {
     }
   }
 
-  #applyGoalUpdated(params: unknown): void {
+  #applyGoalUpdated(params: unknown): boolean {
     const goal = getObject(params, "goal");
     const threadId = getString(params, "threadId");
     const status = getString(goal, "status");
     if (!threadId || !status) {
-      return;
+      return true;
     }
 
     const collector = Array.from(this.#collectors.values()).find(
@@ -551,8 +564,11 @@ export class AppServerRuntime implements AgentRuntime {
         candidate.logContext?.threadRole === "worker" &&
         candidate.logContext.phaseTurn === "execution",
     );
-    if (!collector || status === "active" || status === "paused") {
-      return;
+    if (status === "active" || status === "paused") {
+      return true;
+    }
+    if (!collector) {
+      return false;
     }
 
     const turnId = collector.turnId;
@@ -570,7 +586,7 @@ export class AppServerRuntime implements AgentRuntime {
         ...(collector.diff !== undefined ? { diff: collector.diff } : {}),
         ...(collector.usage !== undefined ? { usage: collector.usage } : {}),
       });
-      return;
+      return true;
     }
 
     const error = `Worker goal ended with status: ${status}`;
@@ -582,6 +598,7 @@ export class AppServerRuntime implements AgentRuntime {
     });
     this.#discardCollector(collector);
     collector.reject(new TurnFailedError(error));
+    return true;
   }
 
   #settleCollector(collector: TurnCollector, result: TurnResult): void {

@@ -201,6 +201,25 @@ input.on("line", async (line) => {
     const turnId = `turn-${++turnCounter}`;
     const prompt = input.text;
     const cwd = message.params.cwd ?? process.cwd();
+    const goalCompletesBeforeTurnResponse =
+      process.env.MOCK_GOAL_COMPLETES_BEFORE_TURN_RESPONSE === "1" &&
+      prompt.includes("read PRE2PROD_PLAN.md and execute it completely");
+    if (goalCompletesBeforeTurnResponse) {
+      await writeFile(resolve(cwd, "mock-fixed.txt"), "fixed\n", "utf8");
+      const goal = goals.get(message.params.threadId);
+      if (goal) {
+        goal.status = "complete";
+        goal.updatedAt = now();
+        send({
+          method: "thread/goal/updated",
+          params: {
+            threadId: message.params.threadId,
+            turnId: "goal-turn",
+            goal,
+          },
+        });
+      }
+    }
     send({
       id: message.id,
       result: { turn: { id: turnId, status: "inProgress", items: [] } },
@@ -300,6 +319,9 @@ input.on("line", async (line) => {
     } else if (
       prompt.includes("read PRE2PROD_PLAN.md and execute it completely")
     ) {
+      if (goalCompletesBeforeTurnResponse) {
+        return;
+      }
       await writeFile(resolve(cwd, "mock-fixed.txt"), "fixed\n", "utf8");
       const goal = goals.get(message.params.threadId);
       if (goal) {

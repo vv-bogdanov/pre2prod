@@ -156,6 +156,10 @@ describe("Pre2prodPipeline with App Server transport", () => {
       args: [mockServer],
       cwd,
       model: "mock-model",
+      env: {
+        ...process.env,
+        MOCK_GOAL_COMPLETES_BEFORE_TURN_RESPONSE: "1",
+      },
     });
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
