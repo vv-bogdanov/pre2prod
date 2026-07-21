@@ -70,27 +70,11 @@ export class ConsoleProgressReporter implements ProgressReporter {
   }
 
   public thinking(message: string, context?: Record<string, unknown>): void {
-    if (!this.#observeEnabled) {
-      return;
-    }
-    const contextLabel = this.#formatContext(context);
-    const prettyJson = tryPrettyJsonLines(message);
-    const lines = prettyJson ?? splitLines(message);
-    const prefix = `      ${contextLabel} think:`;
-    if (prettyJson) {
-      console.log(pc.dim(prefix));
-      for (const line of lines) {
-        console.log(`      ${colorizeJson(line)}`);
-      }
-      return;
-    }
+    this.#observedMessage("think", message, context);
+  }
 
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue;
-      }
-      console.log(pc.dim(`${prefix} ${line}`));
-    }
+  public result(message: string, context?: Record<string, unknown>): void {
+    this.#observedMessage("result", message, context);
   }
 
   public filesTouched(
@@ -147,6 +131,34 @@ export class ConsoleProgressReporter implements ProgressReporter {
         ? `${context.phaseId}#${context.phaseIteration}`
         : "phase";
     return `[${role}/${turn} ${phase}]`;
+  }
+
+  #observedMessage(
+    label: "think" | "result",
+    message: string,
+    context?: Record<string, unknown>,
+  ): void {
+    if (!this.#observeEnabled) {
+      return;
+    }
+    const contextLabel = this.#formatContext(context);
+    const prettyJson = tryPrettyJsonLines(message);
+    const lines = prettyJson ?? splitLines(message);
+    const prefix = `      ${contextLabel} ${label}:`;
+    if (prettyJson) {
+      console.log(pc.dim(prefix));
+      for (const line of lines) {
+        console.log(`      ${colorizeJson(line)}`);
+      }
+      return;
+    }
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      console.log(pc.dim(`${prefix} ${line}`));
+    }
   }
 }
 

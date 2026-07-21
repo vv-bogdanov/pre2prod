@@ -81,6 +81,7 @@ function silentReporter(): ProgressReporter {
     phasePassed() {},
     command() {},
     thinking() {},
+    result() {},
     filesTouched() {},
     waiting() {},
     verbose() {},

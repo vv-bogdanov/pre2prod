@@ -130,6 +130,29 @@ input.on("line", async (line) => {
         },
       });
       send({
+        method: "item/completed",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          item: {
+            type: "reasoning",
+            id: `reasoning-${turnId}`,
+            summary: [
+              { type: "summary_text", text: "Inspecting the repository." },
+            ],
+          },
+        },
+      });
+      send({
+        method: "item/agentMessage/delta",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          itemId: `item-${turnId}`,
+          delta: "Repository ",
+        },
+      });
+      send({
         method: "item/started",
         params: {
           threadId: message.params.threadId,
@@ -154,7 +177,9 @@ input.on("line", async (line) => {
       });
     }
 
-    let text = "Repository studied.";
+    let text = prompt.includes("emit observability")
+      ? "Repository reviewed."
+      : "Repository studied.";
     if (
       prompt.includes("write a complete, minimal, executable remediation plan")
     ) {

@@ -53,10 +53,12 @@ describe("Pre2prodPipeline with App Server transport", () => {
   it("forwards live App Server activity and errors to the reporter", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-runtime-"));
     const thinking: string[] = [];
+    const results: string[] = [];
     const commands: Array<{ command: string; status: string | undefined }> = [];
     const warnings: string[] = [];
     const reporter = silentReporter();
     reporter.thinking = (message) => thinking.push(message);
+    reporter.result = (message) => results.push(message);
     reporter.command = (command, status) => commands.push({ command, status });
     reporter.warning = (message) => warnings.push(message);
     const runtime = new AppServerRuntime({
@@ -79,7 +81,8 @@ describe("Pre2prodPipeline with App Server transport", () => {
       await runtime.close();
     }
 
-    expect(thinking).toContain("Inspecting the repository.");
+    expect(thinking).toEqual(["Inspecting the repository."]);
+    expect(results).toEqual(["Repository reviewed."]);
     expect(commands).toContainEqual({
       command: "git status --short",
       status: "running",
@@ -141,6 +144,7 @@ function silentReporter(): ProgressReporter {
     phasePassed() {},
     command() {},
     thinking() {},
+    result() {},
     filesTouched() {},
     waiting() {},
     verbose() {},

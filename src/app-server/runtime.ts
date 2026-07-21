@@ -306,7 +306,6 @@ export class AppServerRuntime implements AgentRuntime {
     if (method === "item/reasoning/summaryTextDelta") {
       const delta = getString(params, "delta");
       if (delta) {
-        this.#reporter?.thinking(delta, this.#collectorContext(collector));
         this.#logger?.log("debug", "runtime.turn.reasoning_summary", {
           ...this.#collectorContext(collector),
           turnId,
@@ -319,8 +318,6 @@ export class AppServerRuntime implements AgentRuntime {
     if (method === "item/agentMessage/delta") {
       const delta = getString(params, "delta");
       if (delta) {
-        this.#reporter?.thinking(delta, this.#collectorContext(collector));
-        this.#reporter?.verbose(delta);
         this.#logger?.log("debug", "runtime.turn.delta", {
           ...this.#collectorContext(collector),
           turnId,
@@ -356,7 +353,10 @@ export class AppServerRuntime implements AgentRuntime {
       }
       if (item.type === "agentMessage" && typeof item.text === "string") {
         collector.text = item.text;
-        this.#reporter?.thinking(item.text, this.#collectorContext(collector));
+      } else if (item.type === "reasoning") {
+        for (const summary of extractReasoningSummaries(item)) {
+          this.#reporter?.thinking(summary, this.#collectorContext(collector));
+        }
       }
       if (item.type === "commandExecution") {
         const command =
@@ -471,6 +471,12 @@ export class AppServerRuntime implements AgentRuntime {
           ),
         );
       } else {
+        if (collector.text) {
+          this.#reporter?.result(
+            collector.text,
+            this.#collectorContext(collector),
+          );
+        }
         this.#logger?.log("info", "runtime.turn.completed", {
           ...this.#collectorContext(collector),
           turnId,
@@ -611,6 +617,20 @@ function getStringArray(value: unknown, key: string): string[] {
 
 function itemSummary(value: Record<string, unknown>): string | undefined {
   return getString(value, "summary") ?? getString(value, "status");
+}
+
+function extractReasoningSummaries(value: Record<string, unknown>): string[] {
+  const summary = value.summary;
+  if (!Array.isArray(summary)) {
+    return [];
+  }
+  return summary.flatMap((part) => {
+    if (!isRecord(part) || part.type !== "summary_text") {
+      return [];
+    }
+    const text = getString(part, "text");
+    return text?.trim() ? [text] : [];
+  });
 }
 
 function getErrorMessage(value: unknown): string | undefined {
