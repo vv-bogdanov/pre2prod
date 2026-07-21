@@ -26,7 +26,8 @@ persistent Reviewer
 6. No database, workflow framework, MCP, web UI, or DI container.
 7. No language/framework/deployment adapter matrix in the MVP.
 8. Reviewer reads; Worker writes.
-9. Worker must create `PRE2PROD_PLAN.md` before implementation.
+9. Worker must return a complete plan before implementation; the CLI writes it
+   to `PRE2PROD_PLAN.md`.
 10. Worker transcript must not be merged into Reviewer context.
 11. Never claim success without real tool results.
 12. Never perform destructive production operations.

@@ -69,7 +69,7 @@ export function workerPlanningPrompt(
     BASE_PROMPT,
     `You are a disposable worker forked from the review that found material gaps in the phase "${phase.title}". You understand the review context and current repository.`,
     blockerSection(blockers),
-    `Planning stage: investigate the relevant code and write a complete, minimal, executable remediation plan to PRE2PROD_PLAN.md in the repository root. Overwrite the file if it exists. Include the changes, order, checks, and completion condition. Do not modify any other project file during this turn.`,
+    `Planning stage: investigate the relevant code and return the complete, minimal, executable remediation plan as your response. Include the changes, order, checks, and completion condition. Do not modify any files during this turn; the supervisor will save your response to PRE2PROD_PLAN.md.`,
     userInstructions(instructions),
   );
 }

@@ -63,6 +63,8 @@ describe("Pre2prodPipeline", () => {
         JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
         "Plan written",
         "Plan executed",
+        JSON.stringify({ blockers: ["Still blocked"], non_blockers: [] }),
+        "Plan executed",
         JSON.stringify({ blockers: [], non_blockers: [] }),
       ],
       {
@@ -276,7 +278,7 @@ describe("Pre2prodPipeline", () => {
     ).rejects.toThrow(/Reviewer response is not valid JSON/i);
   });
 
-  it("rejects planner changes outside PRE2PROD_PLAN.md before execution", async () => {
+  it("saves the read-only planner response before execution", async () => {
     const cwd = await createInitializedRepo();
     const initialCommits = await countCommits(cwd);
     const runtime = new FakeRuntime(
@@ -285,19 +287,22 @@ describe("Pre2prodPipeline", () => {
         "Repository summary",
         JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
         "Plan written",
+        "Plan executed",
+        JSON.stringify({ blockers: ["Still blocked"], non_blockers: [] }),
       ],
-      { planningExtraFile: "unexpected.txt" },
+      { writePlan: false },
     );
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
     await expect(
       pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
-    ).rejects.toThrow(
-      /Planning turn modified files other than PRE2PROD_PLAN\.md: unexpected\.txt/,
-    );
+    ).rejects.toThrow(/Phase .* did not pass after 1 worker iterations/);
 
-    expect(runtime.goals).toHaveLength(0);
+    expect(runtime.goals).toHaveLength(2);
     expect(await countCommits(cwd)).toBe(initialCommits);
+    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toBe(
+      "Plan written",
+    );
   });
 
   it("keeps persistent reviewer and exact-turn fork behavior", async () => {
@@ -445,25 +450,6 @@ class FakeRuntime implements AgentRuntime {
     const text = this.#responses.shift();
     if (text === undefined) {
       throw new Error("No fake response configured");
-    }
-    if (
-      this.#writePlan &&
-      request.prompt.includes(
-        "write a complete, minimal, executable remediation plan",
-      )
-    ) {
-      await writeFile(
-        resolve(this.#cwd, "PRE2PROD_PLAN.md"),
-        "# Test plan\n",
-        "utf8",
-      );
-      if (this.#planningExtraFile) {
-        await writeFile(
-          resolve(this.#cwd, this.#planningExtraFile),
-          "unexpected\n",
-          "utf8",
-        );
-      }
     }
     if (
       request.prompt.includes("read PRE2PROD_PLAN.md and execute it completely")

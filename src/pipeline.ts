@@ -1,4 +1,11 @@
-import { access, mkdir, readFile, rename, rm } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { resolve } from "node:path";
 
 import type {
@@ -16,7 +23,7 @@ import {
   Pre2prodError,
   throwIfAborted,
 } from "./core/errors.js";
-import { prepareGit, workingTreeStatus } from "./git.js";
+import { prepareGit } from "./git.js";
 import { loadPhases } from "./phases.js";
 import {
   initialDiscoveryPrompt,
@@ -391,7 +398,7 @@ export class Pre2prodPipeline {
         },
       );
 
-      await this.#runTurnWithProgress(
+      const planningTurn = await this.#runTurnWithProgress(
         () =>
           this.#runtime.runTurn({
             threadId: worker.id,
@@ -401,7 +408,7 @@ export class Pre2prodPipeline {
               options.instructions,
             ),
             cwd: options.cwd,
-            sandbox: "workspace-write",
+            sandbox: "read-only",
             networkAccess: false,
             logContext: planningContext,
           }),
@@ -410,8 +417,15 @@ export class Pre2prodPipeline {
         options.signal,
       );
       throwIfAborted(options.signal);
+      if (!planningTurn.text.trim()) {
+        throw new Pre2prodError("Planning turn returned an empty plan");
+      }
+      await writeFile(
+        resolve(options.cwd, PLAN_FILE),
+        planningTurn.text,
+        "utf8",
+      );
       await assertPlanExists(options.cwd);
-      await assertOnlyPlanChanged(options.cwd);
       this.#logger.log(
         "info",
         "phase.worker.planning.completed",
@@ -583,20 +597,6 @@ export class Pre2prodPipeline {
       phaseTurn: context.phaseTurn,
       isRepeat: context.isRepeat,
     };
-  }
-}
-
-async function assertOnlyPlanChanged(cwd: string): Promise<void> {
-  const changedPaths = (await workingTreeStatus(cwd))
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => line.slice(3));
-  const unexpected = changedPaths.filter((path) => path !== PLAN_FILE);
-
-  if (unexpected.length > 0) {
-    throw new Pre2prodError(
-      `Planning turn modified files other than ${PLAN_FILE}: ${unexpected.join(", ")}`,
-    );
   }
 }
 

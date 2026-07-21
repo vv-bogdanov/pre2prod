@@ -280,14 +280,11 @@ input.on("line", async (line) => {
       ? "Repository reviewed."
       : "Repository studied.";
     if (
-      prompt.includes("write a complete, minimal, executable remediation plan")
+      prompt.includes(
+        "return the complete, minimal, executable remediation plan",
+      )
     ) {
-      await writeFile(
-        resolve(cwd, "PRE2PROD_PLAN.md"),
-        "# Plan\n\n1. Create mock-fixed.txt.\n",
-        "utf8",
-      );
-      text = "Plan written.";
+      text = "# Plan\n\n1. Create mock-fixed.txt.\n";
     } else if (
       prompt.includes("read PRE2PROD_PLAN.md and execute it completely")
     ) {
