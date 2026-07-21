@@ -104,6 +104,15 @@ pre2prod -p foundation,verification -x verification-type-safety
 
 # show final phase list after filters
 pre2prod --list -p testing,security -x security
+
+# list available phases in grouped view
+pre2prod --list
+
+Foundation
+  1. foundation-immediate-risk-triage — Immediate Risk Triage
+  2. foundation-reproducible-local-run — Reproducible Local Run
+  3. foundation-core-scope-critical-journeys — Core Scope & Critical Journeys
+  4. foundation-critical-smoke-baseline — Critical Smoke Baseline
 ```
 
 ## Development

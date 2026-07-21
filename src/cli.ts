@@ -60,7 +60,7 @@ program
       );
 
       if (options.list) {
-        for (const phase of formatPhaseList(selectedPhases)) {
+        for (const phase of formatPhaseList(selectedPhases, { dimSlug: true })) {
           console.log(phase);
         }
         return;

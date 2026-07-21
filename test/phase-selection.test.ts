@@ -105,9 +105,25 @@ describe("phase selection", () => {
 
   it("formats phase list", () => {
     expect(formatPhaseList(phases)).toEqual([
-      "1) reproducibility-and-build — Reproducibility and build",
-      "2) testing — Testing",
-      "3) security — Security",
+      "Reproducibility",
+      "  1. reproducibility-and-build — Reproducibility and build",
+      "Testing",
+      "  1. testing — Testing",
+      "Security",
+      "  1. security — Security",
+    ]);
+  });
+
+  it("formats grouped phase list without duplicated group prefixes", () => {
+    expect(formatPhaseList(groupedPhases)).toEqual([
+      "Foundation",
+      "  1. foundation-initial-risk — Initial Risk",
+      "  2. foundation-local-run    — Local Run",
+      "Architecture",
+      "  1. architecture-system-shape — System Shape",
+      "  2. architecture-data-model   — Data Model",
+      "Verification",
+      "  1. verification-type-safety — Type Safety",
     ]);
   });
 });

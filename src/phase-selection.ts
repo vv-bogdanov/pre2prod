@@ -1,3 +1,4 @@
+import pc from "picocolors";
 import { Pre2prodError } from "./core/errors.js";
 import type { Phase } from "./core/types.js";
 
@@ -69,8 +70,39 @@ export function selectPhases(
   return result;
 }
 
-export function formatPhaseList(phases: readonly Phase[]): string[] {
-  return phases.map((phase, index) => `${index + 1}) ${phase.id} — ${phase.title}`);
+type PhaseListOptions = {
+  dimSlug?: boolean;
+};
+
+export function formatPhaseList(
+  phases: readonly Phase[],
+  options: PhaseListOptions = {},
+): string[] {
+  const groups = new Map<string, readonly Phase[]>();
+  for (const phase of phases) {
+    const phaseId = phase.id;
+    const prefix = phaseId.includes("-") ? phaseId.split("-")[0] ?? "" : phaseId;
+    const group = toGroupName(prefix);
+    const list = groups.get(group) ?? [];
+    groups.set(group, [...list, phase]);
+  }
+
+  const output: string[] = [];
+
+  for (const [group, values] of groups) {
+    output.push(group);
+    const maxIdLength = Math.max(...values.map((phase) => phase.id.length));
+
+    values.forEach((phase, index) => {
+      const rawNumber = `${index + 1}.`;
+      const paddedId = `${phase.id}`.padEnd(maxIdLength);
+      const displayTitle = stripGroupPrefix(phase.title, group);
+      const idCell = options.dimSlug ? pc.dim(paddedId) : paddedId;
+      output.push(`  ${rawNumber} ${idCell} — ${displayTitle}`);
+    });
+  }
+
+  return output;
 }
 
 function uniqueFromSource(items: readonly string[]): readonly string[] {
@@ -140,4 +172,22 @@ function validateKnownIds(
     `${flag} references unknown phase id(s): ${unmatchedSelectors.join(", ")}.
 Available ids: ${selectors.join(", ")}`,
   );
+}
+
+function stripGroupPrefix(title: string, groupName: string): string {
+  const marker = `${groupName.toLowerCase()}: `;
+  const normalizedTitle = title.toLowerCase();
+  if (normalizedTitle.startsWith(marker)) {
+    return title.slice(groupName.length + 2);
+  }
+
+  return title;
+}
+
+function toGroupName(prefix: string): string {
+  return prefix
+    .split(/[-_]/g)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`)
+    .join(" ");
 }
