@@ -179,18 +179,14 @@ export class AppServerRuntime implements AgentRuntime {
         ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
       },
     );
-    this.#logger?.log(
-      "info",
-      "runtime.turn.started",
-      {
-        turnId: response.turn.id,
-        threadId: request.threadId,
-        sandbox: request.sandbox,
-        hasOutputSchema: request.outputSchema !== undefined,
-        networkAccess: request.networkAccess ?? true,
-        ...logContext,
-      },
-    );
+    this.#logger?.log("info", "runtime.turn.started", {
+      turnId: response.turn.id,
+      threadId: request.threadId,
+      sandbox: request.sandbox,
+      hasOutputSchema: request.outputSchema !== undefined,
+      networkAccess: request.networkAccess ?? true,
+      ...logContext,
+    });
 
     const turnId = response.turn.id;
     const result = new Promise<TurnResult>((resolve, reject) => {
@@ -302,6 +298,19 @@ export class AppServerRuntime implements AgentRuntime {
       return;
     }
 
+    if (method === "item/reasoning/summaryTextDelta") {
+      const delta = getString(params, "delta");
+      if (delta) {
+        this.#reporter?.thinking(delta, this.#collectorContext(collector));
+        this.#logger?.log("debug", "runtime.turn.reasoning_summary", {
+          ...this.#collectorContext(collector),
+          turnId,
+          deltaSnippet: delta.slice(0, 140),
+        });
+      }
+      return;
+    }
+
     if (method === "item/agentMessage/delta") {
       const delta = getString(params, "delta");
       if (delta) {
@@ -311,6 +320,25 @@ export class AppServerRuntime implements AgentRuntime {
           ...this.#collectorContext(collector),
           turnId,
           deltaSnippet: delta.slice(0, 140),
+        });
+      }
+      return;
+    }
+
+    if (method === "item/started") {
+      const item = getObject(params, "item");
+      if (item?.type === "commandExecution") {
+        const command =
+          typeof item.command === "string" ? item.command : "command";
+        this.#reporter?.command(
+          command,
+          "running",
+          this.#collectorContext(collector),
+        );
+        this.#logger?.log("info", "runtime.command.started", {
+          ...this.#collectorContext(collector),
+          turnId,
+          command,
         });
       }
       return;
@@ -361,6 +389,22 @@ export class AppServerRuntime implements AgentRuntime {
       return;
     }
 
+    if (method === "error") {
+      const error =
+        getErrorMessage(getObject(params, "error")) ??
+        "Unknown App Server error";
+      const willRetry = getBoolean(params, "willRetry") === true;
+      const message = `App Server error${willRetry ? " (retrying)" : ""}: ${error}`;
+      this.#reporter?.warning(message);
+      this.#logger?.log("error", "runtime.turn.error", {
+        ...this.#collectorContext(collector),
+        turnId,
+        error,
+        willRetry,
+      });
+      return;
+    }
+
     if (method === "turn/diff/updated") {
       const diff = getString(params, "diff");
       if (diff !== undefined) {
@@ -407,6 +451,9 @@ export class AppServerRuntime implements AgentRuntime {
       this.#collectors.delete(turnId);
 
       if (normalizedStatus !== "completed") {
+        this.#reporter?.warning(
+          `App Server turn ${normalizedStatus}: ${error ?? "no error details"}`,
+        );
         this.#logger?.log("error", "runtime.turn.failed", {
           ...this.#collectorContext(collector),
           turnId,
@@ -423,8 +470,7 @@ export class AppServerRuntime implements AgentRuntime {
           ...this.#collectorContext(collector),
           turnId,
           status: normalizedStatus,
-          diffLength:
-            collector.diff === undefined ? 0 : collector.diff.length,
+          diffLength: collector.diff === undefined ? 0 : collector.diff.length,
           usage: collector.usage,
           textLength: collector.text.length,
         });
@@ -482,6 +528,12 @@ function getString(value: unknown, key: string): string | undefined {
     : undefined;
 }
 
+function getBoolean(value: unknown, key: string): boolean | undefined {
+  return isRecord(value) && typeof value[key] === "boolean"
+    ? value[key]
+    : undefined;
+}
+
 function getObject(
   value: unknown,
   key: string,
@@ -533,10 +585,7 @@ function extractTouchedPaths(value: Record<string, unknown>): string[] {
   return Array.from(results);
 }
 
-function getArray(
-  value: Record<string, unknown>,
-  key: string,
-): unknown[] {
+function getArray(value: Record<string, unknown>, key: string): unknown[] {
   const items = value[key];
   return Array.isArray(items) ? (items as unknown[]) : [];
 }

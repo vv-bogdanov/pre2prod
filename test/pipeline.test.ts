@@ -92,6 +92,17 @@ describe("Pre2prodPipeline", () => {
     expect(runtime.forks).toEqual([
       { threadId: "reviewer", lastTurnId: "turn-2" },
     ]);
+    expect(runtime.goals).toEqual([
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing: execute PRE2PROD_PLAN.md (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "worker-1", payload: undefined },
+    ]);
   });
 
   it("passes only blockers to worker prompts", async () => {

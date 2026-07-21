@@ -82,7 +82,7 @@ export function workerExecutionPrompt(
   return joinPrompts(
     BASE_PROMPT,
     blockerSection(blockers),
-    `Execution stage for phase "${phase.title}": read PRE2PROD_PLAN.md and execute it completely. Modify the repository, run relevant checks, and fix failures until the plan is complete or genuinely blocked by an unavailable external dependency. Do not ask questions. Do not broaden the work beyond the plan without a concrete necessity.`,
+    `Execution stage for phase "${phase.title}": read PRE2PROD_PLAN.md and execute it completely. Modify the repository, run relevant checks, and fix failures until the plan is complete or genuinely blocked by an unavailable external dependency. Do not ask questions. Do not broaden the work beyond the plan without a concrete necessity. When the plan and checks are complete, mark the active goal complete.`,
     userInstructions(instructions),
   );
 }

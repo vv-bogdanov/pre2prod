@@ -105,6 +105,42 @@ input.on("line", async (line) => {
       params: { turn: { id: turnId, status: "inProgress", items: [] } },
     });
 
+    if (prompt.includes("emit observability")) {
+      send({
+        method: "item/reasoning/summaryTextDelta",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          itemId: `reasoning-${turnId}`,
+          summaryIndex: 0,
+          delta: "Inspecting the repository.",
+        },
+      });
+      send({
+        method: "item/started",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          startedAtMs: Date.now(),
+          item: {
+            type: "commandExecution",
+            id: `command-${turnId}`,
+            command: "git status --short",
+            status: "inProgress",
+          },
+        },
+      });
+      send({
+        method: "error",
+        params: {
+          threadId: message.params.threadId,
+          turnId,
+          willRetry: true,
+          error: { message: "temporary mock error" },
+        },
+      });
+    }
+
     let text = "Repository studied.";
     if (
       prompt.includes("write a complete, minimal, executable remediation plan")

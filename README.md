@@ -7,12 +7,10 @@ Pre2prod is a TypeScript CLI that uses Codex to improve an existing repository t
 ```text
 persistent Reviewer
 → review a readiness phase
-→ set Reviewer phase goal
 → fork a Worker when material gaps exist
-→ set Worker plan/execution goals
 → Worker writes PRE2PROD_PLAN.md
-→ Worker executes the plan
-→ clear Worker goal between iterations/phases
+→ set Worker execution goal
+→ Worker executes the plan and completes the goal
 → Reviewer independently re-reviews the changed repository
 ```
 

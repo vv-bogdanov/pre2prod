@@ -166,7 +166,10 @@ export class Pre2prodPipeline {
     phaseIndex: number,
     phaseTotal: number,
     options: PipelineOptions,
-    commitPhase: (phaseToCommit: { id: string; title: string }) => Promise<void>,
+    commitPhase: (phaseToCommit: {
+      id: string;
+      title: string;
+    }) => Promise<void>,
   ): Promise<PhaseSummary> {
     let isRepeat = false;
     let latestBlockers: string[] = [];
@@ -211,11 +214,6 @@ export class Pre2prodPipeline {
         { summary: true },
       );
       this.#reporter.reviewing(isRepeat);
-      const reviewObjective = this.#reviewGoalObjective(phase, iteration);
-      await this.#runtime.setThreadGoal(reviewerThreadId, {
-        objective: reviewObjective,
-        status: "active",
-      });
 
       let reviewTurn: TurnResult;
       let review: ReturnType<typeof parseReviewResult>;
@@ -231,7 +229,7 @@ export class Pre2prodPipeline {
               logContext: reviewLogContext,
             }),
           reviewLogContext,
-          reviewObjective,
+          `${phase.title} review (iteration ${phaseIteration})`,
         );
         review = parseReviewResult(reviewTurn.text);
         latestBlockers = review.blockers;
@@ -262,8 +260,6 @@ export class Pre2prodPipeline {
           { summary: true },
         );
         throw error;
-      } finally {
-        await this.#runtime.clearThreadGoal(reviewerThreadId);
       }
 
       if (review.blockers.length === 0) {
@@ -350,83 +346,75 @@ export class Pre2prodPipeline {
         },
         { summary: true },
       );
-      const planningObjective = this.#workerPlanningGoalObjective(phase, iteration);
-      const executionObjective = this.#workerExecutionGoalObjective(
+      const planningContext = this.#buildTurnContext(
         phase,
-        iteration,
+        phaseIndex,
+        phaseTotal,
+        phaseIteration,
+        {
+          threadRole: "worker",
+          phaseTurn: "planning",
+          isRepeat: false,
+        },
       );
+
+      await this.#runTurnWithProgress(
+        () =>
+          this.#runtime.runTurn({
+            threadId: worker.id,
+            prompt: workerPlanningPrompt(
+              phase,
+              review.blockers,
+              options.instructions,
+            ),
+            cwd: options.cwd,
+            sandbox: "workspace-write",
+            networkAccess: false,
+            logContext: planningContext,
+          }),
+        planningContext,
+        `${phase.title} worker planning (iteration ${phaseIteration})`,
+      );
+      await assertPlanExists(options.cwd);
+      this.#logger.log(
+        "info",
+        "phase.worker.planning.completed",
+        {
+          ...phaseContext,
+          phaseIteration,
+          threadId: worker.id,
+        },
+        { summary: true },
+      );
+
+      this.#reporter.working();
+      const executionContext = this.#buildTurnContext(
+        phase,
+        phaseIndex,
+        phaseTotal,
+        phaseIteration,
+        {
+          threadRole: "worker",
+          phaseTurn: "execution",
+          isRepeat,
+        },
+      );
+      this.#logger.log(
+        "info",
+        "phase.worker.execution.started",
+        {
+          ...phaseContext,
+          phaseIteration,
+          threadId: worker.id,
+        },
+        { summary: true },
+      );
+      const executionGoal = `${phase.title}: execute PRE2PROD_PLAN.md (iteration ${phaseIteration})`;
       await this.#runtime.setThreadGoal(worker.id, {
-        objective: planningObjective,
+        objective: executionGoal,
         status: "active",
       });
       try {
-        const planningContext = this.#buildTurnContext(
-          phase,
-          phaseIndex,
-          phaseTotal,
-          phaseIteration,
-          {
-            threadRole: "worker",
-            phaseTurn: "planning",
-            isRepeat: false,
-          },
-        );
-
-        await this.#runTurnWithProgress(
-          () =>
-            this.#runtime.runTurn({
-              threadId: worker.id,
-              prompt: workerPlanningPrompt(
-                phase,
-                review.blockers,
-                options.instructions,
-              ),
-              cwd: options.cwd,
-              sandbox: "workspace-write",
-              networkAccess: false,
-              logContext: planningContext,
-            }),
-          planningContext,
-          planningObjective,
-        );
-        await assertPlanExists(options.cwd);
-        this.#logger.log(
-          "info",
-          "phase.worker.planning.completed",
-          {
-            ...phaseContext,
-            phaseIteration,
-            threadId: worker.id,
-          },
-          { summary: true },
-        );
-
-        this.#reporter.working();
-        await this.#runtime.setThreadGoal(worker.id, {
-          objective: executionObjective,
-          status: "active",
-        });
-        const executionContext = this.#buildTurnContext(
-          phase,
-          phaseIndex,
-          phaseTotal,
-          phaseIteration,
-          {
-            threadRole: "worker",
-            phaseTurn: "execution",
-            isRepeat,
-          },
-        );
-        this.#logger.log(
-          "info",
-          "phase.worker.execution.started",
-          {
-            ...phaseContext,
-            phaseIteration,
-            threadId: worker.id,
-          },
-          { summary: true },
-        );
         await this.#runTurnWithProgress(
           () =>
             this.#runtime.runTurn({
@@ -442,21 +430,21 @@ export class Pre2prodPipeline {
               logContext: executionContext,
             }),
           executionContext,
-          executionObjective,
-        );
-        this.#logger.log(
-          "info",
-          "phase.worker.execution.completed",
-          {
-            ...phaseContext,
-            phaseIteration,
-            threadId: worker.id,
-          },
-          { summary: true },
+          executionGoal,
         );
       } finally {
         await this.#runtime.clearThreadGoal(worker.id);
       }
+      this.#logger.log(
+        "info",
+        "phase.worker.execution.completed",
+        {
+          ...phaseContext,
+          phaseIteration,
+          threadId: worker.id,
+        },
+        { summary: true },
+      );
 
       this.#logger.log(
         "info",
@@ -502,10 +490,7 @@ export class Pre2prodPipeline {
     phaseIndex: number,
     phaseTotal: number,
     phaseIteration: number,
-    turn: Pick<
-      TurnLogContext,
-      "threadRole" | "phaseTurn" | "isRepeat"
-    >,
+    turn: Pick<TurnLogContext, "threadRole" | "phaseTurn" | "isRepeat">,
   ): TurnLogContext {
     return {
       runId: this.#logger.runId,
@@ -518,18 +503,6 @@ export class Pre2prodPipeline {
     };
   }
 
-  #reviewGoalObjective(phase: Phase, iteration: number): string {
-    return `${phase.title} review (${formatIteration(iteration)})`;
-  }
-
-  #workerPlanningGoalObjective(phase: Phase, iteration: number): string {
-    return `${phase.title} worker planning (${formatIteration(iteration)})`;
-  }
-
-  #workerExecutionGoalObjective(phase: Phase, iteration: number): string {
-    return `${phase.title} worker execution (${formatIteration(iteration)})`;
-  }
-
   async #runTurnWithProgress<T>(
     runTurn: () => Promise<T>,
     context: TurnLogContext,
@@ -537,15 +510,11 @@ export class Pre2prodPipeline {
   ): Promise<T> {
     const startedAt = Date.now();
     const turnLabel = `${context.threadRole}/${context.phaseTurn} ${context.phaseId}#${context.phaseIteration}`;
-    this.#reporter.waiting(
-      `${turnLabel} started: ${action}`,
-    );
+    this.#reporter.waiting(`${turnLabel} started: ${action}`);
 
     const timer = setInterval(() => {
       const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-      this.#reporter.waiting(
-        `${turnLabel} running (${elapsedSeconds}s)`,
-      );
+      this.#reporter.waiting(`${turnLabel} running (${elapsedSeconds}s)`);
       this.#logger.log("debug", "pipeline.turn.waiting", {
         ...this.#buildLogContext(context),
         elapsedSeconds,
@@ -590,8 +559,4 @@ async function assertPlanExists(cwd: string): Promise<void> {
       cause: error,
     });
   }
-}
-
-function formatIteration(iteration: number): string {
-  return `iteration ${iteration + 1}`;
 }

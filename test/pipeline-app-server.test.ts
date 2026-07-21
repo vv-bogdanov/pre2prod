@@ -43,6 +43,45 @@ describe("Pre2prodPipeline with App Server transport", () => {
     expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toContain("# Plan");
     expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe("fixed\n");
   });
+
+  it("forwards live App Server activity and errors to the reporter", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-runtime-"));
+    const thinking: string[] = [];
+    const commands: Array<{ command: string; status: string | undefined }> = [];
+    const warnings: string[] = [];
+    const reporter = silentReporter();
+    reporter.thinking = (message) => thinking.push(message);
+    reporter.command = (command, status) => commands.push({ command, status });
+    reporter.warning = (message) => warnings.push(message);
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      reporter,
+    });
+
+    try {
+      await runtime.initialize();
+      const thread = await runtime.startThread({ cwd });
+      await runtime.runTurn({
+        threadId: thread.id,
+        prompt: "emit observability",
+        cwd,
+        sandbox: "read-only",
+      });
+    } finally {
+      await runtime.close();
+    }
+
+    expect(thinking).toContain("Inspecting the repository.");
+    expect(commands).toContainEqual({
+      command: "git status --short",
+      status: "running",
+    });
+    expect(warnings).toContain(
+      "App Server error (retrying): temporary mock error",
+    );
+  });
 });
 
 async function initBaseRepository(cwd: string): Promise<void> {
