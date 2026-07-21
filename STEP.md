@@ -17,8 +17,8 @@ a consolidated report and recommendations for the CLI's MVP scope.
   `pre2prod/<timestamp>` wave branch and commits every passed phase. Use
   `--max-iterations 1` unless a rule below overrides it.
 - Run the remaining Operations phases and all Assurance and Delivery phases
-  with `--model gpt-5.3-codex-spark --max-iterations 2` to close a second
-  confirmed remediation cycle without a manual rerun.
+  with the standard Codex provider/model and `--max-iterations 2` to close a
+  second confirmed remediation cycle without a manual rerun.
 - Run only selected, unfinished phases in a logical group per wave. The
   persistent Reviewer performs discovery once and stays alive across that wave.
 - Do not start a later wave until the current wave's commits, logs, reports,
