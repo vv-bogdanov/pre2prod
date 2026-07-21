@@ -1,34 +1,194 @@
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { parse } from "yaml";
+
+import { Pre2prodError } from "./core/errors.js";
 import type { Phase } from "./core/types.js";
 
-export const DEFAULT_PHASES: readonly Phase[] = [
-  {
-    id: "reproducibility-build",
-    title: "Reproducibility and build",
-    reviewerPrompt: `Review whether this repository can be understood, installed, configured, built, and started reproducibly from a clean environment. Check runtime and package-manager consistency, lockfiles, environment documentation and validation, build/start scripts, migrations or setup steps, and obvious local-machine assumptions. Require only material fixes for this application's actual type and scale.`,
-  },
-  {
-    id: "testing",
-    title: "Testing",
-    reviewerPrompt: `Review whether the repository has a necessary and sufficient safety net for its critical behavior and future changes. Inspect business rules, important user journeys, persistence and external integrations, failure paths, concurrency or idempotency where relevant, and existing test reliability. Do not demand 100% coverage or tests that merely inflate metrics.`,
-  },
-  {
-    id: "architecture-maintainability",
-    title: "Architecture and maintainability",
-    reviewerPrompt: `Review material architectural and maintainability risks. Look for harmful coupling, duplicated behavior, hidden side effects, oversized modules, unclear boundaries around the business core and external integrations, global mutable state, and obstacles to reasonable team or traffic growth. Preserve KISS and YAGNI: do not require clean-architecture ceremony, microservices, Kubernetes, or speculative abstractions.`,
-  },
-  {
-    id: "security",
-    title: "Security",
-    reviewerPrompt: `Review the security posture relevant to this project: authentication, authorization, tenant or trust boundaries, input and runtime validation, sessions, secrets, sensitive logging, dependency risks, common web attack surfaces, uploads, webhooks, rate limits, and unsafe defaults. Focus on exploitable or materially risky gaps; do not claim regulatory certification.`,
-  },
-  {
-    id: "repository-ci",
-    title: "Repository and CI",
-    reviewerPrompt: `Review whether another engineer can work with and review this repository reliably. Check essential scripts, concise setup documentation, CI checks, dependency locking, safe secret handling, and repository hygiene. Add only documentation and automation that materially improve repeatability and reviewability.`,
-  },
-  {
-    id: "deployment-readiness",
-    title: "Deployment readiness",
-    reviewerPrompt: `Review whether the project is prepared for a simple and reliable staging deployment. Prefer an existing target. Otherwise choose the simplest suitable managed platform and preserve the current architecture. Avoid Kubernetes and complex cloud infrastructure without a concrete need. Railway is a reasonable soft default for a typical backend with PostgreSQL. Missing credentials must not block local preparation: configuration, build/start commands, health checks, migrations, and deployment instructions should still be prepared. Do not perform destructive production operations.`,
-  },
-] as const;
+const INTERNAL_PHASES_PATH = fileURLToPath(new URL("../resources/phases.yaml", import.meta.url));
+
+export async function loadPhases(cwd: string): Promise<readonly Phase[]> {
+  const fromProject = await tryLoadPhases(resolve(cwd, ".pre2prod", "phases.yaml"));
+  if (fromProject !== undefined) {
+    return fromProject;
+  }
+
+  const fromHome = await tryLoadPhases(resolve(homedir(), ".pre2prod", "phases.yaml"));
+  if (fromHome !== undefined) {
+    return fromHome;
+  }
+
+  return loadPhasesFromFile(INTERNAL_PHASES_PATH, new Set());
+}
+
+async function tryLoadPhases(path: string): Promise<readonly Phase[] | undefined> {
+  try {
+    return await loadPhasesFromFile(path, new Set());
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function loadPhasesFromFile(path: string, stack: Set<string>): Promise<readonly Phase[]> {
+  const absolutePath = resolve(path);
+  if (stack.has(absolutePath)) {
+    throw new Pre2prodError(
+      `Detected circular phases include while resolving ${absolutePath}: ${[...stack, absolutePath].join(" -> ")}`,
+    );
+  }
+
+  stack.add(absolutePath);
+
+  try {
+    let rawContent: string;
+    try {
+      rawContent = await readFile(absolutePath, "utf8");
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        throw error;
+      }
+      throw new Pre2prodError(`Failed to read phase config ${absolutePath}`, { cause: error });
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = parse(rawContent);
+    } catch (error) {
+      throw new Pre2prodError(`Failed to parse YAML in ${absolutePath}`, { cause: error });
+    }
+
+    const document = parsePhaseDocument(parsed, absolutePath);
+
+    let phases: Phase[] = [];
+    for (const include of document.include) {
+      const includedPath = resolve(dirname(absolutePath), include);
+      try {
+        const includedPhases = await loadPhasesFromFile(includedPath, stack);
+        phases = mergePhases(phases, includedPhases);
+      } catch (error) {
+        throw new Pre2prodError(
+          `Failed to process include "${includedPath}" from ${absolutePath}: ${getErrorMessage(error)}`,
+          { cause: error },
+        );
+      }
+    }
+
+    return mergePhases(phases, document.phases);
+  } finally {
+    stack.delete(absolutePath);
+  }
+}
+
+function parsePhaseDocument(raw: unknown, path: string): PhaseConfig {
+  if (raw === null || raw === undefined) {
+    throw new Pre2prodError(`Invalid phase document in ${path}: expected an object or an array`);
+  }
+
+  if (Array.isArray(raw)) {
+    return { include: [], phases: parsePhases(raw, path, "root list") };
+  }
+
+  if (!isRecord(raw)) {
+    throw new Pre2prodError(`Invalid phase document in ${path}: expected an object or an array`);
+  }
+
+  const include = parseInclude(raw.include, path);
+  const phases = parsePhases(raw.phases, path, "phases");
+  return { include, phases };
+}
+
+function parseInclude(rawInclude: unknown, path: string): readonly string[] {
+  if (rawInclude === undefined) {
+    return [];
+  }
+
+  if (typeof rawInclude === "string") {
+    return [rawInclude];
+  }
+
+  if (Array.isArray(rawInclude)) {
+    const includes = rawInclude.map((item, index) => {
+      if (typeof item !== "string" || item.trim() === "") {
+        throw new Pre2prodError(
+          `Invalid include at index ${index} in ${path}; include entries must be non-empty strings`,
+        );
+      }
+      return item;
+    });
+    return includes;
+  }
+
+  throw new Pre2prodError(`Invalid include in ${path}; expected a string or list of strings`);
+}
+
+function parsePhases(rawPhases: unknown, path: string, propertyPath: string): readonly Phase[] {
+  if (rawPhases === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(rawPhases)) {
+    throw new Pre2prodError(`Invalid ${propertyPath} in ${path}; expected a list of phases`);
+  }
+
+  return rawPhases.map((rawPhase, index) => {
+    if (!isRecord(rawPhase)) {
+      throw new Pre2prodError(`Invalid phase at ${propertyPath}[${index}] in ${path}; expected an object`);
+    }
+
+    const id = toNonEmptyString(rawPhase.id, `${propertyPath}[${index}].id`, path);
+    const title = toNonEmptyString(rawPhase.title, `${propertyPath}[${index}].title`, path);
+    const reviewerPrompt = toNonEmptyString(
+      rawPhase.reviewerPrompt,
+      `${propertyPath}[${index}].reviewerPrompt`,
+      path,
+    );
+
+    return { id, title, reviewerPrompt };
+  });
+}
+
+function toNonEmptyString(value: unknown, fieldPath: string, sourcePath: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Pre2prodError(`Invalid ${fieldPath} in ${sourcePath}; expected a non-empty string`);
+  }
+
+  return value;
+}
+
+function mergePhases(base: readonly Phase[], override: readonly Phase[]): Phase[] {
+  const merged = [...base];
+
+  for (const phase of override) {
+    const index = merged.findIndex((current) => current.id === phase.id);
+    if (index === -1) {
+      merged.push(phase);
+      continue;
+    }
+    merged[index] = phase;
+  }
+
+  return merged;
+}
+
+function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
+  return isRecord(error) && error.code === "ENOENT";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+interface PhaseConfig {
+  include: readonly string[];
+  phases: readonly Phase[];
+}

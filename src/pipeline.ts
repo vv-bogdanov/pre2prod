@@ -11,7 +11,7 @@ import type {
 } from "./core/types.js";
 import { PhaseFailedError, Pre2prodError } from "./core/errors.js";
 import { prepareGit } from "./git.js";
-import { DEFAULT_PHASES } from "./phases.js";
+import { loadPhases } from "./phases.js";
 import {
   initialDiscoveryPrompt,
   phaseReviewPrompt,
@@ -25,12 +25,12 @@ const PLAN_FILE = "PRE2PROD_PLAN.md";
 export class Pre2prodPipeline {
   readonly #runtime: AgentRuntime;
   readonly #reporter: ProgressReporter;
-  readonly #phases: readonly Phase[];
+  readonly #phases: readonly Phase[] | undefined;
 
   public constructor(
     runtime: AgentRuntime,
     reporter: ProgressReporter,
-    phases: readonly Phase[] = DEFAULT_PHASES,
+    phases?: readonly Phase[],
   ) {
     this.#runtime = runtime;
     this.#reporter = reporter;
@@ -39,6 +39,7 @@ export class Pre2prodPipeline {
 
   public async run(options: PipelineOptions): Promise<PipelineResult> {
     this.#reporter.title();
+    const phases = this.#phases ?? (await loadPhases(options.cwd));
 
     try {
       await this.#runtime.initialize();
@@ -58,8 +59,8 @@ export class Pre2prodPipeline {
 
       const summaries: PhaseSummary[] = [];
 
-      for (const [index, phase] of this.#phases.entries()) {
-        this.#reporter.phaseStarted(index + 1, this.#phases.length, phase);
+      for (const [index, phase] of phases.entries()) {
+        this.#reporter.phaseStarted(index + 1, phases.length, phase);
         const summary = await this.#runPhase(reviewer.id, phase, options, (phaseId, iteration) =>
           git.commitWorker(phaseId, iteration),
         );
