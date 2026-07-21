@@ -88,10 +88,13 @@ Options:
   --verbose                   show streamed model and command details
   --dev                       rebuild from TypeScript before running (development mode)
 
-Use `--dev` or `PRE2PROD_DEV=1` when you want the executable to rebuild automatically before each run:
+In a local source checkout (`.git`, `src/`), pre2prod rebuilds automatically before each run.
+For installed/prod usage, no rebuild occurs.
+
+Use `--dev` to force rebuild explicitly (or `PRE2PROD_DEV=1` as legacy override):
 
 ```bash
-PRE2PROD_DEV=1 pre2prod -C . -o --max-iterations 1
+pre2prod -C . -o --max-iterations 1
 ```
 
 `pre2prod logs` reads run logs in `.pre2prod/logs` (or `--log-dir` override):

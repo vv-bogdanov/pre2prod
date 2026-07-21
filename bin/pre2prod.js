@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
@@ -10,9 +11,14 @@ const projectRoot = resolve(__dirname, "..");
 const cliPath = resolve(projectRoot, "dist", "cli.js");
 
 const args = process.argv.slice(2);
+const isSourceCheckout =
+  existsSync(resolve(projectRoot, ".git")) &&
+  existsSync(resolve(projectRoot, "src")) &&
+  existsSync(resolve(projectRoot, "tsconfig.json"));
 const isDevMode =
   process.env.PRE2PROD_DEV === "1" ||
   process.env.PRE2PROD_DEV === "true" ||
+  isSourceCheckout ||
   args.includes("--dev");
 const cleanedArgs = args.filter((arg) => arg !== "--dev");
 
