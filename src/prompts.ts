@@ -21,6 +21,8 @@ Inspect real files and real command results. Never claim success based only on r
 Do not perform destructive production operations. Do not use or expose production secrets. If external credentials are unavailable, prepare everything possible locally, document the remaining external action, and continue.`;
 
 const REVIEWER_DIRECTION = `You are the persistent senior reviewer for the entire run. Maintain a high-level understanding of the project across phases. Review the actual current repository independently. Do not trust claims from workers. Fail a phase only for material readiness gaps. Do not modify application files.`;
+const REVIEW_RESULT_POSTFIX =
+  "Put only material findings that justify another change cycle in blockers; put optional improvements in non_blockers.";
 
 export function initialDiscoveryPrompt(instructions?: string): string {
   return joinPrompts(
@@ -45,23 +47,41 @@ export function phaseReviewPrompt(
     REVIEWER_DIRECTION,
     `Current phase: ${phase.title}\n\n${phase.reviewerPrompt}`,
     repeatDirection,
-    `Return only a JSON object matching the provided schema. Use PASS when there are no material gaps. Use NEEDS_WORK and list only material findings otherwise.`,
+    REVIEW_RESULT_POSTFIX,
     userInstructions(instructions),
   );
 }
 
-export function workerPlanningPrompt(phase: Phase, instructions?: string): string {
+function blockerSection(blockers: string[]): string {
+  return [
+    "Material gaps to fix:",
+    ...blockers.map((finding) => `- ${finding}`),
+    "",
+  ].join("\n");
+}
+
+export function workerPlanningPrompt(
+  phase: Phase,
+  blockers: string[],
+  instructions?: string,
+): string {
   return joinPrompts(
     BASE_PROMPT,
     `You are a disposable worker forked from the review that found material gaps in the phase "${phase.title}". You understand the review context and current repository.`,
+    blockerSection(blockers),
     `Planning stage: investigate the relevant code and write a complete, minimal, executable remediation plan to PRE2PROD_PLAN.md in the repository root. Overwrite the file if it exists. Include the changes, order, checks, and completion condition. Do not modify any other project file during this turn.`,
     userInstructions(instructions),
   );
 }
 
-export function workerExecutionPrompt(phase: Phase, instructions?: string): string {
+export function workerExecutionPrompt(
+  phase: Phase,
+  blockers: string[],
+  instructions?: string,
+): string {
   return joinPrompts(
     BASE_PROMPT,
+    blockerSection(blockers),
     `Execution stage for phase "${phase.title}": read PRE2PROD_PLAN.md and execute it completely. Modify the repository, run relevant checks, and fix failures until the plan is complete or genuinely blocked by an unavailable external dependency. Do not ask questions. Do not broaden the work beyond the plan without a concrete necessity.`,
     userInstructions(instructions),
   );

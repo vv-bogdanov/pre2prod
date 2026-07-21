@@ -19,7 +19,7 @@ import {
   workerExecutionPrompt,
   workerPlanningPrompt,
 } from "./prompts.js";
-import { parseReviewResult, REVIEW_OUTPUT_SCHEMA } from "./reviewer.js";
+import { parseReviewResult, REVIEW_RESULT_SCHEMA } from "./reviewer.js";
 
 const PLAN_FILE = "PRE2PROD_PLAN.md";
 
@@ -90,7 +90,7 @@ export class Pre2prodPipeline {
     commitWorker: (phaseId: string, iteration: number) => Promise<void>,
   ): Promise<PhaseSummary> {
     let isRepeat = false;
-    let latestFindings: string[] = [];
+    let latestBlockers: string[] = [];
 
     for (
       let iteration = 0;
@@ -110,20 +110,20 @@ export class Pre2prodPipeline {
           prompt: phaseReviewPrompt(phase, options.instructions, isRepeat),
           cwd: options.cwd,
           sandbox: "readOnly",
-          outputSchema: REVIEW_OUTPUT_SCHEMA,
+          outputSchema: REVIEW_RESULT_SCHEMA,
         });
         review = parseReviewResult(reviewTurn.text);
       } finally {
         await this.#runtime.clearThreadGoal(reviewerThreadId);
       }
-      latestFindings = review.findings;
+      latestBlockers = review.blockers;
 
-      if (review.status === "PASS") {
+      if (review.blockers.length === 0) {
         this.#reporter.phasePassed();
         return { phase, iterations: iteration, passed: true, findings: [] };
       }
 
-      this.#reporter.needsWork(review.findings);
+      this.#reporter.needsWork(review.blockers);
       if (iteration >= options.maxIterationsPerPhase) {
         throw new PhaseFailedError(
           phase.id,
@@ -144,7 +144,11 @@ export class Pre2prodPipeline {
       try {
         await this.#runtime.runTurn({
           threadId: worker.id,
-          prompt: workerPlanningPrompt(phase, options.instructions),
+          prompt: workerPlanningPrompt(
+            phase,
+            review.blockers,
+            options.instructions,
+          ),
           cwd: options.cwd,
           sandbox: "workspaceWrite",
           networkAccess: false,
@@ -158,7 +162,11 @@ export class Pre2prodPipeline {
         });
         await this.#runtime.runTurn({
           threadId: worker.id,
-          prompt: workerExecutionPrompt(phase, options.instructions),
+          prompt: workerExecutionPrompt(
+            phase,
+            review.blockers,
+            options.instructions,
+          ),
           cwd: options.cwd,
           sandbox: "workspaceWrite",
           networkAccess: options.networkAccess,
@@ -172,7 +180,7 @@ export class Pre2prodPipeline {
     }
 
     throw new Pre2prodError(
-      `Unreachable phase state for ${phase.id}: ${latestFindings.join("; ")}`,
+      `Unreachable phase state for ${phase.id}: ${latestBlockers.join("; ")}`,
     );
   }
 
