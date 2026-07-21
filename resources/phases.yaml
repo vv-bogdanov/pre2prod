@@ -79,7 +79,7 @@
 # Wave 4: Product
 "Product: UX Completeness": |
   Review completion of critical user-facing states and journeys. Check loading,
-  empty, error, success, validation feedback, destructive confirmations, recovery,
+  empty, erChangesror, success, validation feedback, destructive confirmations, recovery,
   responsiveness, and equivalent CLI behavior where relevant. Do not add
   nonessential features.
 

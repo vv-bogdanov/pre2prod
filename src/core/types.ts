@@ -52,6 +52,19 @@ export interface TurnRequest {
   sandbox: SandboxMode;
   networkAccess?: boolean;
   outputSchema?: Record<string, unknown>;
+  logContext?: TurnLogContext;
+}
+
+export interface TurnLogContext {
+  runId: string;
+  phaseId: string;
+  phaseIndex: number;
+  phaseTitle: string;
+  phaseIteration: number;
+  phaseTotal: number;
+  threadRole: "reviewer" | "worker";
+  phaseTurn: "review" | "planning" | "execution";
+  isRepeat: boolean;
 }
 
 export interface TurnResult {
@@ -105,7 +118,11 @@ export interface ProgressReporter {
   planning(planPath: string): void;
   working(): void;
   phasePassed(): void;
-  command(command: string, status?: string): void;
+  command(
+    command: string,
+    status?: string,
+    context?: Record<string, unknown>,
+  ): void;
   verbose(message: string): void;
   completed(result: PipelineResult): void;
   failed(message: string): void;

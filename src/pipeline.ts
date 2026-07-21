@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import type {
   AgentRuntime,
   Phase,
+  TurnLogContext,
   TurnResult,
   PhaseSummary,
   PipelineOptions,
@@ -19,6 +20,7 @@ import {
   workerExecutionPrompt,
   workerPlanningPrompt,
 } from "./prompts.js";
+import { createRunId, NoopRunLogger, type RunLogger } from "./logging.js";
 import { parseReviewResult, REVIEW_RESULT_SCHEMA } from "./reviewer.js";
 
 const PLAN_FILE = "PRE2PROD_PLAN.md";
@@ -27,20 +29,38 @@ export class Pre2prodPipeline {
   readonly #runtime: AgentRuntime;
   readonly #reporter: ProgressReporter;
   readonly #phases: readonly Phase[] | undefined;
+  readonly #logger: RunLogger;
 
   public constructor(
     runtime: AgentRuntime,
     reporter: ProgressReporter,
     phases?: readonly Phase[],
+    logger?: RunLogger,
   ) {
     this.#runtime = runtime;
     this.#reporter = reporter;
     this.#phases = phases;
+    this.#logger = logger ?? new NoopRunLogger(createRunId());
   }
 
   public async run(options: PipelineOptions): Promise<PipelineResult> {
     this.#reporter.title();
     const phases = this.#phases ?? (await loadPhases(options.cwd));
+    const runId = this.#logger.runId;
+
+    this.#logger.log(
+      "info",
+      "pipeline.run.started",
+      {
+        runId,
+        cwd: options.cwd,
+        phases: phases.length,
+        model: options.model,
+        maxIterationsPerPhase: options.maxIterationsPerPhase,
+        networkAccess: options.networkAccess,
+      },
+      { summary: true },
+    );
 
     try {
       await this.#runtime.initialize();
@@ -51,13 +71,37 @@ export class Pre2prodPipeline {
       });
 
       this.#reporter.info("Studying repository...");
+      this.#logger.log("info", "pipeline.discovery.started", {
+        runId,
+        threadId: reviewer.id,
+      });
       await this.#runtime.runTurn({
         threadId: reviewer.id,
         prompt: initialDiscoveryPrompt(options.instructions),
         cwd: options.cwd,
         sandbox: "readOnly",
         outputSchema: REVIEW_RESULT_SCHEMA,
+        logContext: {
+          runId,
+          phaseId: "discovery",
+          phaseIndex: 0,
+          phaseTitle: "discovery",
+          phaseIteration: 0,
+          phaseTotal: phases.length,
+          threadRole: "reviewer",
+          phaseTurn: "review",
+          isRepeat: false,
+        },
       });
+      this.#logger.log(
+        "info",
+        "pipeline.discovery.completed",
+        {
+          runId,
+          threadId: reviewer.id,
+        },
+        { summary: true },
+      );
 
       const summaries: PhaseSummary[] = [];
 
@@ -66,6 +110,8 @@ export class Pre2prodPipeline {
         const summary = await this.#runPhase(
           reviewer.id,
           phase,
+          index + 1,
+          phases.length,
           options,
           (phaseToCommit) => git.commitPhase(phaseToCommit),
         );
@@ -78,7 +124,29 @@ export class Pre2prodPipeline {
         ...(git.branch ? { gitBranch: git.branch } : {}),
       };
       this.#reporter.completed(result);
+      this.#logger.log(
+        "info",
+        "pipeline.run.completed",
+        {
+          runId,
+          phasesPassed: result.phases.filter((phase) => phase.passed).length,
+          phasesTotal: result.phases.length,
+          failed: result.phases.some((phase) => !phase.passed),
+        },
+        { summary: true },
+      );
       return result;
+    } catch (error) {
+      this.#logger.log(
+        "error",
+        "pipeline.run.failed",
+        {
+          runId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { summary: true },
+      );
+      throw error;
     } finally {
       await this.#runtime.close();
     }
@@ -87,23 +155,60 @@ export class Pre2prodPipeline {
   async #runPhase(
     reviewerThreadId: string,
     phase: Phase,
+    phaseIndex: number,
+    phaseTotal: number,
     options: PipelineOptions,
     commitPhase: (phaseToCommit: { id: string; title: string }) => Promise<void>,
   ): Promise<PhaseSummary> {
     let isRepeat = false;
     let latestBlockers: string[] = [];
+    const runId = this.#logger.runId;
+    const phaseContext = {
+      runId,
+      phaseId: phase.id,
+      phaseIndex,
+      phaseTitle: phase.title,
+      phaseTotal,
+    };
+
+    this.#logger.log("info", "pipeline.phase.started", phaseContext, {
+      summary: true,
+    });
 
     for (
       let iteration = 0;
       iteration <= options.maxIterationsPerPhase;
       iteration += 1
     ) {
+      const phaseIteration = iteration + 1;
+      const reviewLogContext = this.#buildTurnContext(
+        phase,
+        phaseIndex,
+        phaseTotal,
+        phaseIteration,
+        {
+          threadRole: "reviewer",
+          phaseTurn: "review",
+          isRepeat,
+        },
+      );
+
+      this.#logger.log(
+        "info",
+        "phase.review.started",
+        {
+          ...phaseContext,
+          ...reviewLogContext,
+        },
+        { summary: true },
+      );
       this.#reporter.reviewing(isRepeat);
       await this.#runtime.setThreadGoal(reviewerThreadId, {
         objective: this.#reviewGoalObjective(phase, iteration),
         status: "active",
       });
-      let reviewTurn: TurnResult | undefined;
+
+      let reviewTurn: TurnResult;
       let review: ReturnType<typeof parseReviewResult>;
       try {
         reviewTurn = await this.#runtime.runTurn({
@@ -112,21 +217,91 @@ export class Pre2prodPipeline {
           cwd: options.cwd,
           sandbox: "readOnly",
           outputSchema: REVIEW_RESULT_SCHEMA,
+          logContext: reviewLogContext,
         });
         review = parseReviewResult(reviewTurn.text);
+        latestBlockers = review.blockers;
+
+        this.#logger.log(
+          "info",
+          "phase.review.completed",
+          {
+            ...phaseContext,
+            phaseIteration,
+            blockers: review.blockers,
+            nonBlockers: review.non_blockers,
+            blockersCount: review.blockers.length,
+            nonBlockersCount: review.non_blockers.length,
+            turnId: reviewTurn.turnId,
+          },
+          { summary: true },
+        );
+      } catch (error) {
+        this.#logger.log(
+          "error",
+          "phase.review.failed",
+          {
+            ...phaseContext,
+            phaseIteration,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          { summary: true },
+        );
+        throw error;
       } finally {
         await this.#runtime.clearThreadGoal(reviewerThreadId);
       }
-      latestBlockers = review.blockers;
 
       if (review.blockers.length === 0) {
         this.#reporter.phasePassed();
+        this.#logger.log(
+          "info",
+          "phase.review.passed",
+          {
+            ...phaseContext,
+            phaseIteration,
+            turnId: reviewTurn.turnId,
+          },
+          { summary: true },
+        );
+        this.#logger.log(
+          "info",
+          "pipeline.phase.completed",
+          {
+            ...phaseContext,
+            phaseIteration,
+          },
+          { summary: true },
+        );
         await commitPhase(phase);
         return { phase, iterations: iteration, passed: true, findings: [] };
       }
 
       this.#reporter.needsWork(review.blockers);
+      this.#logger.log(
+        "warn",
+        "phase.review.blockers",
+        {
+          ...phaseContext,
+          phaseIteration,
+          blockers: review.blockers,
+          blockersCount: review.blockers.length,
+        },
+        { summary: true },
+      );
+
       if (iteration >= options.maxIterationsPerPhase) {
+        this.#logger.log(
+          "error",
+          "phase.review.max_iterations_reached",
+          {
+            ...phaseContext,
+            phaseIteration,
+            blockers: review.blockers,
+            maxIterationsPerPhase: options.maxIterationsPerPhase,
+          },
+          { summary: true },
+        );
         throw new PhaseFailedError(
           phase.id,
           `Phase "${phase.title}" did not pass after ${options.maxIterationsPerPhase} worker iterations`,
@@ -137,13 +312,47 @@ export class Pre2prodPipeline {
         reviewerThreadId,
         reviewTurn.turnId,
       );
+      this.#logger.log(
+        "info",
+        "phase.worker.forked",
+        {
+          ...phaseContext,
+          phaseIteration,
+          workerThreadId: worker.id,
+          sourceTurnId: reviewTurn.turnId,
+        },
+        { summary: true },
+      );
+
       await rm(resolve(options.cwd, PLAN_FILE), { force: true });
       this.#reporter.planning(PLAN_FILE);
+      this.#logger.log(
+        "info",
+        "phase.worker.planning.started",
+        {
+          ...phaseContext,
+          phaseIteration,
+          threadId: worker.id,
+        },
+        { summary: true },
+      );
       await this.#runtime.setThreadGoal(worker.id, {
         objective: this.#workerPlanningGoalObjective(phase, iteration),
         status: "active",
       });
       try {
+        const planningContext = this.#buildTurnContext(
+          phase,
+          phaseIndex,
+          phaseTotal,
+          phaseIteration,
+          {
+            threadRole: "worker",
+            phaseTurn: "planning",
+            isRepeat: false,
+          },
+        );
+
         await this.#runtime.runTurn({
           threadId: worker.id,
           prompt: workerPlanningPrompt(
@@ -154,14 +363,46 @@ export class Pre2prodPipeline {
           cwd: options.cwd,
           sandbox: "workspaceWrite",
           networkAccess: false,
+          logContext: planningContext,
         });
         await assertPlanExists(options.cwd);
+        this.#logger.log(
+          "info",
+          "phase.worker.planning.completed",
+          {
+            ...phaseContext,
+            phaseIteration,
+            threadId: worker.id,
+          },
+          { summary: true },
+        );
 
         this.#reporter.working();
         await this.#runtime.setThreadGoal(worker.id, {
           objective: this.#workerExecutionGoalObjective(phase, iteration),
           status: "active",
         });
+        const executionContext = this.#buildTurnContext(
+          phase,
+          phaseIndex,
+          phaseTotal,
+          phaseIteration,
+          {
+            threadRole: "worker",
+            phaseTurn: "execution",
+            isRepeat,
+          },
+        );
+        this.#logger.log(
+          "info",
+          "phase.worker.execution.started",
+          {
+            ...phaseContext,
+            phaseIteration,
+            threadId: worker.id,
+          },
+          { summary: true },
+        );
         await this.#runtime.runTurn({
           threadId: worker.id,
           prompt: workerExecutionPrompt(
@@ -172,17 +413,80 @@ export class Pre2prodPipeline {
           cwd: options.cwd,
           sandbox: "workspaceWrite",
           networkAccess: options.networkAccess,
+          logContext: executionContext,
         });
+        this.#logger.log(
+          "info",
+          "phase.worker.execution.completed",
+          {
+            ...phaseContext,
+            phaseIteration,
+            threadId: worker.id,
+          },
+          { summary: true },
+        );
       } finally {
         await this.#runtime.clearThreadGoal(worker.id);
       }
 
+      this.#logger.log(
+        "info",
+        "phase.worker.completed",
+        {
+          ...phaseContext,
+          phaseIteration,
+          workerThreadId: worker.id,
+        },
+        { summary: true },
+      );
+
+      this.#logger.log(
+        "info",
+        "phase.review.retry",
+        {
+          ...phaseContext,
+          phaseIteration,
+        },
+        { summary: true },
+      );
+
       isRepeat = true;
     }
+
+    this.#logger.log(
+      "error",
+      "phase.review.unreachable_state",
+      {
+        ...phaseContext,
+        blockers: latestBlockers,
+      },
+      { summary: true },
+    );
 
     throw new Pre2prodError(
       `Unreachable phase state for ${phase.id}: ${latestBlockers.join("; ")}`,
     );
+  }
+
+  #buildTurnContext(
+    phase: Phase,
+    phaseIndex: number,
+    phaseTotal: number,
+    phaseIteration: number,
+    turn: Pick<
+      TurnLogContext,
+      "threadRole" | "phaseTurn" | "isRepeat"
+    >,
+  ): TurnLogContext {
+    return {
+      runId: this.#logger.runId,
+      phaseId: phase.id,
+      phaseIndex,
+      phaseTitle: phase.title,
+      phaseIteration,
+      phaseTotal,
+      ...turn,
+    };
   }
 
   #reviewGoalObjective(phase: Phase, iteration: number): string {
