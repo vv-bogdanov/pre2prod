@@ -122,6 +122,31 @@ describe("Pre2prodPipeline with App Server transport", () => {
     );
   });
 
+  it("fails without a checkpoint when the App Server exits during review", async () => {
+    const cwd = await mkdtemp(
+      resolve(tmpdir(), "pre2prod-exit-during-review-"),
+    );
+    await initBaseRepository(cwd);
+    const initialCommits = await countCommits(cwd);
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      env: { ...process.env, MOCK_EXIT_DURING_REVIEW: "1" },
+    });
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await expect(
+      pipeline.run({
+        cwd,
+        maxIterationsPerPhase: 2,
+        networkAccess: false,
+      }),
+    ).rejects.toThrow(/Codex App Server exited unexpectedly/);
+
+    expect(await countCommits(cwd)).toBe(initialCommits);
+  });
+
   it("clears a non-complete worker goal and does not commit the phase", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-goal-failure-"));
     await initBaseRepository(cwd);

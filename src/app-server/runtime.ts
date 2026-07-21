@@ -75,6 +75,7 @@ export class AppServerRuntime implements AgentRuntime {
   >();
   #initialized = false;
   #unsubscribe: (() => void) | undefined;
+  #unsubscribeFailure: (() => void) | undefined;
 
   public constructor(options: AppServerRuntimeOptions) {
     this.#reporter = options.reporter;
@@ -83,6 +84,9 @@ export class AppServerRuntime implements AgentRuntime {
     this.#clientVersion = options.clientVersion ?? "0.1.0";
     this.#logger = options.logger;
     this.#client = new JsonRpcProcessClient(options);
+    this.#unsubscribeFailure = this.#client.onFailure((error) =>
+      this.#failActiveTurns(error),
+    );
   }
 
   public async initialize(): Promise<void> {
@@ -274,6 +278,7 @@ export class AppServerRuntime implements AgentRuntime {
   public async close(): Promise<void> {
     this.#logger?.log("debug", "runtime.close.start");
     this.#unsubscribe?.();
+    this.#unsubscribeFailure?.();
     await this.#client.close();
     this.#logger?.log("debug", "runtime.close.complete");
   }
@@ -563,6 +568,18 @@ export class AppServerRuntime implements AgentRuntime {
   #discardCollector(collector: TurnCollector): void {
     this.#settledTurnIds.add(collector.turnId);
     this.#collectors.delete(collector.turnId);
+  }
+
+  #failActiveTurns(error: Error): void {
+    for (const collector of this.#collectors.values()) {
+      this.#logger?.log("error", "runtime.turn.failed", {
+        ...this.#collectorContext(collector),
+        turnId: collector.turnId,
+        error: error.message,
+      });
+      this.#discardCollector(collector);
+      collector.reject(error);
+    }
   }
 
   #collectorContext(collector: TurnCollector): Record<string, unknown> {

@@ -27,11 +27,13 @@ export interface JsonRpcClientOptions {
 }
 
 export type NotificationHandler = (method: string, params: unknown) => void;
+type FailureHandler = (error: Error) => void;
 
 export class JsonRpcProcessClient {
   readonly #options: JsonRpcClientOptions;
   readonly #pending = new Map<JsonRpcId, Deferred<unknown>>();
   readonly #notificationHandlers = new Set<NotificationHandler>();
+  readonly #failureHandlers = new Set<FailureHandler>();
   #nextId = 1;
   #process?: ChildProcessWithoutNullStreams;
   #lines?: ReadlineInterface;
@@ -56,7 +58,7 @@ export class JsonRpcProcessClient {
     child.stderr.pipe(this.#options.stderr ?? process.stderr);
 
     child.once("error", (error) => {
-      this.#rejectAll(
+      this.#fail(
         new ProtocolError(
           `Failed to start Codex App Server: ${error.message}`,
           { cause: error },
@@ -66,7 +68,7 @@ export class JsonRpcProcessClient {
 
     child.once("exit", (code, signal) => {
       if (!this.#closed) {
-        this.#rejectAll(
+        this.#fail(
           new ProtocolError(
             `Codex App Server exited unexpectedly (code=${String(code)}, signal=${String(signal)})`,
           ),
@@ -82,6 +84,11 @@ export class JsonRpcProcessClient {
   public onNotification(handler: NotificationHandler): () => void {
     this.#notificationHandlers.add(handler);
     return () => this.#notificationHandlers.delete(handler);
+  }
+
+  public onFailure(handler: FailureHandler): () => void {
+    this.#failureHandlers.add(handler);
+    return () => this.#failureHandlers.delete(handler);
   }
 
   public async request<T>(method: string, params?: unknown): Promise<T> {
@@ -139,7 +146,7 @@ export class JsonRpcProcessClient {
     try {
       parsed = JSON.parse(line);
     } catch (error) {
-      this.#rejectAll(
+      this.#fail(
         new ProtocolError(`Invalid JSON from Codex App Server: ${line}`, {
           cause: error,
         }),
@@ -149,7 +156,7 @@ export class JsonRpcProcessClient {
 
     const message = parseIncomingMessage(parsed);
     if (!message) {
-      this.#rejectAll(
+      this.#fail(
         new ProtocolError("Invalid JSON-RPC message from Codex App Server"),
       );
       return;
@@ -206,5 +213,12 @@ export class JsonRpcProcessClient {
       deferred.reject(error);
     }
     this.#pending.clear();
+  }
+
+  #fail(error: Error): void {
+    this.#rejectAll(error);
+    for (const handler of this.#failureHandlers) {
+      handler(error);
+    }
   }
 }

@@ -37,6 +37,11 @@ input.on("line", (line) => {
     return;
   }
 
+  if (message.method === "exit-pending") {
+    setTimeout(() => process.exit(17), 10);
+    return;
+  }
+
   if (message.method === "malformed-scalar") {
     sendRaw('"not a JSON-RPC message"');
     return;

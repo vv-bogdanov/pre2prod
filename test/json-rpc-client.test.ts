@@ -44,6 +44,21 @@ describe("JsonRpcProcessClient", () => {
     }
   });
 
+  it("rejects a pending request when the subprocess exits", async () => {
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: [mockServer],
+    });
+    await client.start();
+    try {
+      await expect(client.request("exit-pending")).rejects.toThrow(
+        /exited unexpectedly \(code=17, signal=null\)/i,
+      );
+    } finally {
+      await client.close();
+    }
+  });
+
   it.each(["malformed-scalar", "malformed-response"])(
     "rejects malformed JSON-RPC output: %s",
     async (method) => {

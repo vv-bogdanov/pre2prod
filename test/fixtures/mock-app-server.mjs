@@ -180,6 +180,14 @@ input.on("line", async (line) => {
       params: { turn: { id: turnId, status: "inProgress", items: [] } },
     });
 
+    if (
+      process.env.MOCK_EXIT_DURING_REVIEW === "1" &&
+      prompt.includes("Current phase")
+    ) {
+      setTimeout(() => process.exit(17), 10);
+      return;
+    }
+
     if (prompt.includes("emit observability")) {
       send({
         method: "item/reasoning/summaryTextDelta",
