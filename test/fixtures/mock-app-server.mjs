@@ -186,8 +186,20 @@ input.on("line", async (line) => {
       });
       return;
     }
+    const input = message.params.input?.[0];
+    if (
+      input?.type !== "text" ||
+      typeof input.text !== "string" ||
+      !Array.isArray(input.text_elements)
+    ) {
+      send({
+        id: message.id,
+        error: { code: -32602, message: "Invalid text input" },
+      });
+      return;
+    }
     const turnId = `turn-${++turnCounter}`;
-    const prompt = message.params.input?.[0]?.text ?? "";
+    const prompt = input.text;
     const cwd = message.params.cwd ?? process.cwd();
     send({
       id: message.id,

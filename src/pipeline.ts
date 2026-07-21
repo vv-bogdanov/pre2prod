@@ -18,11 +18,7 @@ import type {
   PipelineResult,
   ProgressReporter,
 } from "./core/types.js";
-import {
-  PhaseFailedError,
-  Pre2prodError,
-  throwIfAborted,
-} from "./core/errors.js";
+import { Pre2prodError, throwIfAborted } from "./core/errors.js";
 import { prepareGit } from "./git.js";
 import { loadPhases } from "./phases.js";
 import {
@@ -350,10 +346,25 @@ export class Pre2prodPipeline {
           },
           { summary: true },
         );
-        throw new PhaseFailedError(
-          phase.id,
-          `Phase "${phase.title}" did not pass after ${options.maxIterationsPerPhase} worker iterations`,
+        const message = `Phase "${phase.title}" remains blocked after ${options.maxIterationsPerPhase} worker iterations; continuing to the next phase.`;
+        this.#reporter.warning(message);
+        this.#logger.log(
+          "warn",
+          "phase.review.max_iterations_reached",
+          {
+            ...phaseContext,
+            phaseIteration,
+            blockersCount: review.blockers.length,
+            maxIterationsPerPhase: options.maxIterationsPerPhase,
+          },
+          { summary: true },
         );
+        return {
+          phase,
+          iterations: iteration,
+          passed: false,
+          findings: review.blockers,
+        };
       }
 
       throwIfAborted(options.signal);
@@ -486,7 +497,24 @@ export class Pre2prodPipeline {
         );
       } finally {
         if (!options.signal?.aborted) {
-          await this.#runtime.clearThreadGoal(worker.id);
+          try {
+            await this.#runtime.clearThreadGoal(worker.id);
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            this.#logger.log(
+              "warn",
+              "phase.worker.goal.clear.failed",
+              {
+                ...phaseContext,
+                phaseIteration,
+                threadId: worker.id,
+                error: message,
+              },
+              { summary: true },
+            );
+            this.#reporter.warning(`Worker goal cleanup failed: ${message}`);
+          }
         }
       }
       throwIfAborted(options.signal);

@@ -114,6 +114,23 @@ export class ConsoleProgressReporter implements ProgressReporter {
     if (result.gitBranch) {
       console.log(`Branch: ${redactSensitiveText(result.gitBranch)}`);
     }
+    const blocked = result.phases.filter((phase) => !phase.passed);
+    if (blocked.length > 0) {
+      console.log(pc.yellow("Phases still requiring work:"));
+      for (const phase of blocked) {
+        console.log(
+          pc.yellow(`      - ${redactSensitiveText(phase.phase.id)}`),
+        );
+        for (const finding of phase.findings) {
+          console.log(pc.dim(`        ${redactSensitiveText(finding)}`));
+        }
+      }
+      console.log(
+        pc.yellow(
+          `Rerun: pre2prod --phases ${blocked.map((phase) => phase.phase.id).join(",")}`,
+        ),
+      );
+    }
     console.log(
       "Review the resulting repository before production deployment.",
     );

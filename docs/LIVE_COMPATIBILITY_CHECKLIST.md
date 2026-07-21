@@ -6,19 +6,26 @@ The automated suite validates orchestration against a protocol-faithful mock pro
 - [x] Generate the installed CLI's TypeScript bindings and compare the used
       subset. `initialize` requires `capabilities`; read-only and workspace-write
       turn sandbox policies require explicit network and workspace exclusion
-      fields. The adapter sends those fields.
+      fields, text input requires `text_elements`, and the current server
+      includes modern approval request methods. The adapter sends the required
+      fields, declines those approval forms without granting permissions, and
+      includes the required `_meta: null` in elicitation declines.
 - [ ] Run the live checks below on a host where Codex can create Linux user
-      namespaces for Bubblewrap. On 2026-07-21, a direct local launch with a
-      temporary Codex home initialized state files but stopped before JSON-RPC with
-      `Codex's Linux sandbox uses bubblewrap and needs access to create user
-namespaces.` No credentials or repository files were used by that probe.
-- [ ] Run `pnpm run validate` on that normal host. In this managed sandbox, 47
-      tests passed but the six subprocess-transport tests received immediate
-      successful exits from nested Node processes, so they cannot validate the
-      JSON-RPC client here.
-- [ ] Confirm `codex app-server` starts over stdio.
-- [ ] Confirm `initialize` and `initialized` handshake.
-- [ ] Confirm `thread/start` accepts `cwd`, `approvalPolicy`, `sandbox`, and `serviceName`.
+      namespaces for Bubblewrap and with authenticated Codex access. A
+      2026-07-22 disposable CLI run using an empty `CODEX_HOME` reached
+      `initialize`, `thread/start`, and the first read-only Reviewer turn, but
+      the host reported the Bubblewrap user-namespace error and the turn then
+      retried until Codex returned 401 Unauthorized. No credentials were used.
+- [x] Run `pnpm run validate` in the writable workspace with temporary test
+      files confined to `.pre2prod/test-tmp-run`: formatting, typechecking,
+      linting, build, 92 tests, and coverage thresholds passed.
+- [x] Confirm `codex app-server` starts over stdio: the disposable CLI run
+      emitted App Server warnings and JSON-RPC telemetry before the blocked
+      Reviewer turn.
+- [x] Confirm `initialize` and `initialized` handshake: the run logged
+      `runtime.initialize.complete`.
+- [x] Confirm `thread/start` accepts `cwd`, `approvalPolicy`, `sandbox`, and
+      `serviceName`: the run logged a returned Reviewer thread ID.
 - [ ] Confirm Reviewer turns run under read-only sandbox.
 - [ ] Confirm `outputSchema` produces parseable Reviewer JSON.
 - [ ] Confirm `thread/fork` accepts `lastTurnId` for a non-ephemeral Worker.

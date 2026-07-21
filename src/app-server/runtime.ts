@@ -188,7 +188,7 @@ export class AppServerRuntime implements AgentRuntime {
     const response = parseTurnStartResponse(
       await this.#client.request<unknown>("turn/start", {
         threadId: request.threadId,
-        input: [{ type: "text", text: request.prompt }],
+        input: [{ type: "text", text: request.prompt, text_elements: [] }],
         cwd: request.cwd,
         approvalPolicy: "never",
         sandboxPolicy:

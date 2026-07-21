@@ -16,7 +16,6 @@ import type {
   TurnRequest,
   TurnResult,
 } from "../src/core/types.js";
-import { PhaseFailedError } from "../src/core/errors.js";
 import { FileRunLogger } from "../src/logging.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
 import { REVIEW_RESULT_SCHEMA } from "../src/reviewer.js";
@@ -144,9 +143,15 @@ describe("Pre2prodPipeline", () => {
       logger,
     );
 
-    await expect(
-      pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
-    ).rejects.toBeInstanceOf(PhaseFailedError);
+    const result = await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 1,
+      networkAccess: false,
+    });
+    expect(result.phases[0]).toMatchObject({
+      passed: false,
+      findings: ["Final blocker"],
+    });
 
     const content = await readFile(FileRunLogger.paths(logCwd).summary, "utf8");
     const reviewEvents = content
@@ -199,6 +204,57 @@ describe("Pre2prodPipeline", () => {
       },
       { action: "clear", threadId: "worker-1", payload: undefined },
     ]);
+  });
+
+  it("preserves execution failure when worker goal cleanup also fails", async () => {
+    const cwd = await createInitializedRepo();
+    const initialCommits = await countCommits(cwd);
+    const logCwd = await mkdtemp(resolve(tmpdir(), "pre2prod-cleanup-logs-"));
+    const logger = new FileRunLogger({
+      cwd: logCwd,
+      runId: "worker-cleanup-failure",
+    });
+    const runtime = new FakeRuntime(
+      cwd,
+      [
+        "Repository summary",
+        JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+        "Plan written",
+        "Plan executed",
+      ],
+      {
+        executionError: new Error("worker turn failed"),
+        clearGoalError: new Error("goal cleanup failed"),
+      },
+    );
+    const pipeline = new Pre2prodPipeline(
+      runtime,
+      silentReporter(),
+      [phase],
+      logger,
+    );
+
+    await expect(
+      pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
+    ).rejects.toThrow("worker turn failed");
+
+    expect(runtime.goals).toEqual([
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing: execute PRE2PROD_PLAN.md (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "worker-1", payload: undefined },
+    ]);
+    expect(runtime.requests).toHaveLength(4);
+    expect(await countCommits(cwd)).toBe(initialCommits);
+
+    const log = await readFile(FileRunLogger.paths(logCwd).summary, "utf8");
+    expect(log).toContain('"event":"phase.worker.goal.clear.failed"');
+    expect(log).toContain('"error":"goal cleanup failed"');
   });
 
   it("passes only blockers to worker prompts", async () => {
@@ -294,9 +350,15 @@ describe("Pre2prodPipeline", () => {
     );
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
-    await expect(
-      pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
-    ).rejects.toThrow(/Phase .* did not pass after 1 worker iterations/);
+    const result = await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 1,
+      networkAccess: false,
+    });
+    expect(result.phases[0]).toMatchObject({
+      passed: false,
+      findings: ["Still blocked"],
+    });
 
     expect(runtime.goals).toHaveLength(2);
     expect(await countCommits(cwd)).toBe(initialCommits);
@@ -327,7 +389,7 @@ describe("Pre2prodPipeline", () => {
     ]);
   });
 
-  it("does not commit while phase is failing max iterations", async () => {
+  it("does not commit while phase remains blocked after max iterations", async () => {
     const cwd = await createInitializedRepo();
     const initialCommits = await countCommits(cwd);
     const runtime = new FakeRuntime(cwd, [
@@ -339,9 +401,12 @@ describe("Pre2prodPipeline", () => {
     ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
-    await expect(
-      pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
-    ).rejects.toBeInstanceOf(PhaseFailedError);
+    const result = await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 1,
+      networkAccess: false,
+    });
+    expect(result.phases[0]?.passed).toBe(false);
     expect(await countCommits(cwd)).toBe(initialCommits);
   });
 
@@ -410,6 +475,8 @@ class FakeRuntime implements AgentRuntime {
   readonly #writePlan: boolean;
   readonly #planningExtraFile: string | undefined;
   readonly #onRunTurn: ((request: TurnRequest) => void) | undefined;
+  readonly #executionError: Error | undefined;
+  readonly #clearGoalError: Error | undefined;
   #turn = 0;
   #worker = 0;
   #goalStorage = new Map<string, ThreadGoal>();
@@ -421,6 +488,8 @@ class FakeRuntime implements AgentRuntime {
       writePlan?: boolean;
       planningExtraFile?: string;
       onRunTurn?: (request: TurnRequest) => void;
+      executionError?: Error;
+      clearGoalError?: Error;
     } = {},
   ) {
     this.#cwd = cwd;
@@ -428,6 +497,8 @@ class FakeRuntime implements AgentRuntime {
     this.#writePlan = options.writePlan ?? true;
     this.#planningExtraFile = options.planningExtraFile;
     this.#onRunTurn = options.onRunTurn;
+    this.#executionError = options.executionError;
+    this.#clearGoalError = options.clearGoalError;
   }
 
   public async initialize(): Promise<void> {}
@@ -454,6 +525,9 @@ class FakeRuntime implements AgentRuntime {
     if (
       request.prompt.includes("read PRE2PROD_PLAN.md and execute it completely")
     ) {
+      if (this.#executionError) {
+        throw this.#executionError;
+      }
       await writeFile(resolve(this.#cwd, "mock-fixed.txt"), "fixed\n", "utf8");
     }
     return { turnId: `turn-${++this.#turn}`, status: "completed", text };
@@ -485,6 +559,9 @@ class FakeRuntime implements AgentRuntime {
 
   public async clearThreadGoal(threadId: string): Promise<boolean> {
     this.goals.push({ action: "clear", threadId, payload: undefined });
+    if (this.#clearGoalError) {
+      throw this.#clearGoalError;
+    }
     return this.#goalStorage.delete(threadId);
   }
 

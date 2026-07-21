@@ -261,12 +261,23 @@ export class JsonRpcProcessClient {
       case "item/fileChange/requestApproval":
         this.respond(id, { decision: "decline" });
         break;
+      case "execCommandApproval":
+      case "applyPatchApproval":
+        this.respond(id, { decision: "denied" });
+        break;
+      case "item/permissions/requestApproval":
+        this.respond(id, {
+          permissions: {},
+          scope: "turn",
+          strictAutoReview: true,
+        });
+        break;
       case "tool/requestUserInput":
       case "item/tool/requestUserInput":
         this.respond(id, { answers: {} });
         break;
       case "mcpServer/elicitation/request":
-        this.respond(id, { action: "decline", content: null });
+        this.respond(id, { action: "decline", content: null, _meta: null });
         break;
       default:
         this.respond(id, {});

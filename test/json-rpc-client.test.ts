@@ -37,6 +37,22 @@ describe("JsonRpcProcessClient", () => {
     }
   });
 
+  it("denies modern approval requests without granting permissions", async () => {
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: [mockServer],
+    });
+
+    await client.start();
+    try {
+      await expect(client.request("trigger-modern-approvals")).resolves.toEqual(
+        { ok: true },
+      );
+    } finally {
+      await client.close();
+    }
+  });
+
   it("surfaces JSON-RPC failures", async () => {
     const client = new JsonRpcProcessClient({
       command: process.execPath,
