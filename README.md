@@ -6,26 +6,27 @@
 
 ## The missing second half of vibe coding
 
-**From vibe-coded PoC to production-ready MVP.**
+**From a working PoC to a production-ready MVP.**
 
-Vibe coding can produce a working prototype in hours. Turning it into a clean,
-tested, secure, maintainable, and deployable product still requires a long
-sequence of engineering reviews.
+Thousands of products are vibe-coded every day. Only a small fraction make it
+to production.
 
-Pre2Prod automates that workflow with a persistent GPT-5.6 Reviewer and
-temporary Codex Workers that plan and implement material improvements directly
-in the repository. The Reviewer then verifies every change independently.
+Getting the first version to work is fast. The long part comes next:
+architecture, tests, security, observability, cleanup, and delivery.
+
+Pre2Prod runs that work as 41 focused reviews. One GPT-5.6 Reviewer keeps the
+context for the whole run. When it finds a real blocker, it forks a Codex Worker
+to plan and fix it. Then the Reviewer checks the result and moves on.
 
 ```bash
 npx --yes pre2prod
 ```
 
-**41 expert reviews · 9 production-readiness stages · configurable through YAML**
+**41 reviews · 9 stages · prompts configurable in YAML**
 
 > [!IMPORTANT]
-> Pre2Prod requires a clean Git repository and an installed, authenticated Codex
-> CLI. It changes source code, but never deploys or performs destructive
-> production operations. Review the resulting diff before using it in staging.
+> Pre2Prod edits your repository. Start with a clean Git tree and review every
+> diff. It never deploys or touches production.
 
 ## Quick start
 
@@ -52,12 +53,13 @@ npx --yes pre2prod \
 
 [Watch the demo on YouTube](YOUTUBE_URL)
 
-The demo shows Pre2Prod running on its own repository while the Reviewer and
-Workers progress through the configured production-readiness workflow.
+This is Pre2Prod running on its own repository. The video shows the real
+workflow starting and moving through its reviews.
 
 ## Quick evaluation
 
-Check the local environment and inspect the built-in workflow:
+You do not need to run all 41 reviews to test Pre2Prod. Check the local
+environment and inspect the built-in workflow:
 
 ```bash
 npx --yes pre2prod doctor
@@ -78,19 +80,18 @@ a clean Git repository that you are prepared to review.
 ## Supported platforms
 
 - Linux (Ubuntu 24.04): tested in CI and during local dogfooding.
-- macOS: expected to work, but not yet verified by CI or a documented live run.
-- Windows: expected through WSL2, but not yet verified by CI or a documented
-  live run.
-
-Requires Node.js 20.19 or newer, Git, and an installed and authenticated Codex
-CLI with App Server support.
+- macOS: should work, not tested yet.
+- Windows: should work through WSL2, not tested yet.
 
 ## How it works
 
-Pre2Prod keeps one Reviewer thread for the entire run. A phase with no blockers
-passes immediately. Material blockers fork a temporary Worker from the exact
-review turn; that Worker plans in read-only mode, receives a goal, applies the
-plan, and returns control to the persistent Reviewer.
+One Reviewer thread stays alive for the whole run and keeps what it has learned
+about the repository.
+
+If a review finds no blockers, Pre2Prod moves to the next phase. If it finds a
+blocker, it forks a temporary Worker from that exact review turn. The Worker
+writes a plan and executes it. The original Reviewer then reads the changed
+repository and reviews it again.
 
 ```mermaid
 flowchart LR
@@ -107,31 +108,27 @@ flowchart LR
     style W fill:#fff4cc,stroke:#b7791f,color:#111827
 ```
 
-The Worker transcript is never merged back into the Reviewer context. The
-Reviewer independently re-reads the changed repository. Optional
-`non_blockers` never trigger a Worker.
+The Worker transcript is never copied back into the Reviewer thread. The
+Reviewer sees the changed files, not the Worker's explanation.
 
-By default, a phase gets up to three Worker iterations. If blockers remain,
-Pre2Prod warns, records the unresolved findings, and continues to the next
-phase so the final summary can identify phases worth rerunning.
+Optional `non_blockers` are recorded but never trigger a Worker. A phase gets
+three Worker attempts by default. If blockers remain, Pre2Prod reports them and
+moves on.
 
 ## Built with Codex and GPT-5.6
 
-Pre2Prod uses Codex App Server as its execution runtime.
+Pre2Prod is not one large prompt wrapped in a CLI. It uses Codex App Server
+threads, turns, forks, goals, sandboxes, and structured output directly.
 
-- GPT-5.6 powers the persistent Reviewer that accumulates repository context
-  across the complete workflow.
-- Codex thread forking creates temporary Workers from the exact review turn
-  that discovered the blockers.
-- Workers plan in read-only mode before receiving workspace-write access to
-  execute the plan.
-- Structured output separates material `blockers` from informational
-  `non_blockers`.
-- The original Reviewer independently re-reads the changed repository after
-  every Worker execution.
+- One GPT-5.6 Reviewer keeps context across the run.
+- Each Worker is forked from the review turn that found the blocker.
+- Planning is read-only.
+- Only plan execution gets workspace-write access.
+- Reviewer output is split into `blockers` and informational `non_blockers`.
+- The original Reviewer checks the repository again after every fix.
 
-Pre2Prod itself was improved by running this workflow on its own repository.
-The resulting phase checkpoints are visible in the public Git history.
+Pre2Prod was dogfooded on its own repository. Its checkpoint commits are visible
+in the Git history.
 
 ## Usage
 
@@ -189,10 +186,9 @@ default. Use `--verbose` for additional App Server detail.
 
 ### Models and local providers
 
-Without flags, Pre2Prod uses the model and provider configured by Codex. The
-Build Week submission was developed and dogfooded with GPT-5.6. Explicit model
-IDs must be supported by the installed Codex CLI; a supported local provider
-can also be selected:
+By default, Pre2Prod uses the model and provider configured in Codex. This Build
+Week version was built and dogfooded with GPT-5.6. Use explicit model IDs only
+when the installed Codex CLI supports them. Local providers are also supported:
 
 ```bash
 pre2prod --local-provider ollama --model your-local-model
@@ -266,14 +262,14 @@ Delivery
 
 ## Custom phases
 
-Pre2Prod uses the first `phases.yaml` found in this order:
+Pre2Prod checks these paths in order. The first file found wins:
 
 1. `<project>/.pre2prod/phases.yaml`
 2. `$HOME/.pre2prod/phases.yaml`
 3. bundled `resources/phases.yaml`
 
-The compact format maps each phase title to a multiline Reviewer prompt. Its
-selection slug is derived from the title.
+In the short format, each key is a review title and each value is its prompt.
+The selection slug is generated from the title.
 
 ```yaml
 "Architecture and maintainability": |
@@ -285,14 +281,12 @@ Security: |
   Focus on exploitable or materially risky gaps.
 ```
 
-The full format additionally supports `include`, an explicit `phases` list,
-custom IDs, and object-style phase definitions. Includes are resolved relative
-to the YAML file and checked for cycles.
+Need includes or custom IDs? The full object format supports both. Include paths
+are relative to the YAML file and checked for cycles.
 
 ## Logs and diagnostics
 
-Every run prints its run ID and writes two bounded JSONL logs under
-`.pre2prod/logs`:
+Every run prints a run ID and appends to two JSONL files under `.pre2prod/logs`:
 
 - `pre2prod-summary.jsonl` contains run and phase lifecycle events;
 - `pre2prod-events.jsonl` contains detailed Reviewer, Worker, command, and
@@ -308,9 +302,9 @@ pre2prod logs --event phase.review.blockers --phase-id architecture
 pre2prod logs --full --role worker --turn execution
 ```
 
-Logs are redacted before persistence and limited to 10 MiB per file by
-retaining complete recent records. A logging failure emits a warning but does
-not replace the terminal result.
+The logs redact common secrets. Each file is capped at 10 MiB; old complete
+records are dropped first. If logging fails, Pre2Prod prints a warning and keeps
+the real command result.
 
 Before a long run, verify the complete local path with:
 
@@ -334,14 +328,12 @@ pre2prod doctor -C .
 
 ## Data and privacy
 
-Pre2Prod sends repository material, prompts, and tool context required for each
-turn to the selected Codex or local model provider. Provider-side processing
-and retention follow that provider's configuration and terms. Do not run it on
-source or data you are not authorized to share.
+Codex needs to read the repository. Pre2Prod sends the context required for each
+turn to the provider configured in Codex. That provider's terms and retention
+rules apply. Do not run it on source or data you are not allowed to share.
 
-Pre2Prod itself has no analytics service. Local diagnostics stay under
-`.pre2prod`; remove that directory when its logs, plans, and reports are no
-longer needed.
+Pre2Prod itself sends no analytics. Logs, plans, and reports stay under
+`.pre2prod`; delete that directory when you no longer need them.
 
 ## Troubleshooting
 
