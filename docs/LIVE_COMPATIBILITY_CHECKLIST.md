@@ -8,7 +8,7 @@ The automated suite validates orchestration against a protocol-faithful mock pro
 - [ ] Confirm `thread/start` accepts `cwd`, `approvalPolicy`, `sandbox`, and `serviceName`.
 - [ ] Confirm Reviewer turns run under read-only sandbox.
 - [ ] Confirm `outputSchema` produces parseable Reviewer JSON.
-- [ ] Confirm `thread/fork` accepts `lastTurnId` and `ephemeral: true`.
+- [ ] Confirm `thread/fork` accepts `lastTurnId` for a non-ephemeral Worker.
 - [ ] Confirm `thread/goal/set` endpoint shape.
 - [ ] Confirm `thread/goal/get` endpoint shape.
 - [ ] Confirm `thread/goal/clear` endpoint shape.

@@ -180,7 +180,10 @@ PRE2PROD_PLAN.md
 
 Worker сам выбирает инструменты репозитория, меняет код и конфигурацию, добавляет действительно необходимые тесты и запускает релевантные проверки.
 
-Persistent goal API для MVP не требуется. Plan-файл и следующий execution turn достаточны.
+После planning turn CLI задаёт Worker execution goal. Для этого Worker fork
+должен быть non-ephemeral: goal API App Server не поддерживается ephemeral
+threads. Worker остаётся одноразовым на уровне pipeline: он не продолжается и
+не объединяется обратно с Reviewer.
 
 ## 9. Re-review
 

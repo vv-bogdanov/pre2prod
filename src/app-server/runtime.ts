@@ -146,7 +146,9 @@ export class AppServerRuntime implements AgentRuntime {
     const response = await this.#client.request<ThreadResponse>("thread/fork", {
       threadId,
       lastTurnId,
-      ephemeral: true,
+      // App Server goals are unavailable on ephemeral threads. The pipeline
+      // still treats this worker as disposable and never resumes it.
+      ephemeral: false,
     });
     this.#logger?.log("debug", "runtime.thread.fork", {
       parentThreadId: threadId,

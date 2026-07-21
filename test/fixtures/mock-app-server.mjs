@@ -45,6 +45,16 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "thread/fork") {
+    if (message.params?.ephemeral) {
+      send({
+        id: message.id,
+        error: {
+          code: -32602,
+          message: "ephemeral thread does not support goals",
+        },
+      });
+      return;
+    }
     const id = `thread-${++threadCounter}`;
     send({
       id: message.id,
