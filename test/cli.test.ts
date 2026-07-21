@@ -1,5 +1,13 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import {
+  mkdir,
+  mkdtemp,
+  open,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -10,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const execFileAsync = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
 const cliPath = resolve(here, "..", "dist", "cli.js");
+const mockCodex = resolve(here, "fixtures", "mock-app-server.mjs");
 let cwd: string;
 
 describe("pre2prod CLI", () => {
@@ -57,26 +66,112 @@ describe("pre2prod CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toMatch(expected);
   });
+
+  it("completes a reviewer-worker-re-review journey through the public command", async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), "pre2prod-cli-e2e-"));
+
+    try {
+      await initBaseRepository(repository);
+      await mkdir(resolve(repository, ".pre2prod"), { recursive: true });
+      await writeFile(
+        resolve(repository, ".pre2prod", "phases.yaml"),
+        [
+          "phases:",
+          "  - id: mock-readiness",
+          "    title: Mock readiness",
+          "    reviewerPrompt: Require mock-fixed.txt to exist.",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      const result = await runCli(
+        "--cwd",
+        repository,
+        "--codex-bin",
+        mockCodex,
+        "--max-iterations",
+        "1",
+        "--no-network",
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toContain("Pre2prod completed");
+      expect(
+        await readFile(resolve(repository, "mock-fixed.txt"), "utf8"),
+      ).toBe("fixed\n");
+      await expect(
+        readFile(resolve(repository, "PRE2PROD_PLAN.md"), "utf8"),
+      ).rejects.toThrow();
+
+      const archivedPlans = await readdir(
+        resolve(repository, ".pre2prod", "plans"),
+      );
+      expect(archivedPlans).toHaveLength(1);
+      expect(
+        await readFile(
+          resolve(repository, ".pre2prod", "plans", archivedPlans[0] ?? ""),
+          "utf8",
+        ),
+      ).toContain("# Plan");
+
+      const events = (
+        await readFile(
+          resolve(repository, ".pre2prod", "logs", "pre2prod-events.jsonl"),
+          "utf8",
+        )
+      )
+        .trim()
+        .split("\n")
+        .map(
+          (line) => JSON.parse(line) as { event?: string; isRepeat?: boolean },
+        );
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          event: "phase.review.started",
+          isRepeat: true,
+        }),
+      );
+      expect(await execGit(repository, ["status", "--porcelain"])).toBe("");
+      expect(
+        (await execGit(repository, ["log", "-1", "--pretty=%s"])).trim(),
+      ).toBe("pre2prod(mock-readiness): Mock readiness");
+    } finally {
+      await rm(repository, { recursive: true, force: true });
+    }
+  });
 });
 
 async function runCli(...args: string[]): Promise<CliResult> {
+  const outputDirectory = await mkdtemp(
+    resolve(tmpdir(), "pre2prod-cli-output-"),
+  );
+  const stdoutPath = resolve(outputDirectory, "stdout.log");
+  const stderrPath = resolve(outputDirectory, "stderr.log");
+  const stdout = await open(stdoutPath, "w");
+  const stderr = await open(stderrPath, "w");
+
   try {
-    const result = await execFileAsync(process.execPath, [cliPath, ...args], {
+    const child = spawn(process.execPath, [cliPath, ...args], {
       cwd,
-      encoding: "utf8",
+      stdio: ["ignore", stdout.fd, stderr.fd],
     });
-    return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
-  } catch (error) {
-    const result = error as {
-      code?: number;
-      stdout?: string;
-      stderr?: string;
-    };
+
+    const exitCode = await new Promise<number>((resolveExit, reject) => {
+      child.once("error", reject);
+      child.once("close", (code) => resolveExit(code ?? 1));
+    });
+
     return {
-      exitCode: typeof result.code === "number" ? result.code : 1,
-      stdout: result.stdout ?? "",
-      stderr: result.stderr ?? "",
+      exitCode,
+      stdout: await readFile(stdoutPath, "utf8"),
+      stderr: await readFile(stderrPath, "utf8"),
     };
+  } finally {
+    await stdout.close();
+    await stderr.close();
+    await rm(outputDirectory, { recursive: true, force: true });
   }
 }
 
@@ -99,4 +194,25 @@ async function packageVersion(): Promise<string> {
     throw new Error("package.json must contain a string version");
   }
   return parsed.version;
+}
+
+async function initBaseRepository(cwd: string): Promise<void> {
+  await execGit(cwd, ["init"]);
+  await writeFile(resolve(cwd, "base.txt"), "base\n", "utf8");
+  await writeFile(resolve(cwd, ".gitignore"), ".pre2prod/\n", "utf8");
+  await execGit(cwd, ["add", "base.txt", ".gitignore"]);
+  await execGit(cwd, [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "initial",
+  ]);
+}
+
+async function execGit(cwd: string, args: string[]): Promise<string> {
+  const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
+  return result.stdout;
 }
