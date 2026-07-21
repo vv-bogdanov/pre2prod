@@ -7,9 +7,9 @@ import {
 import { ProtocolError } from "../core/errors.js";
 import {
   isFailure,
+  parseIncomingMessage,
   isResponse,
   isServerRequest,
-  type IncomingMessage,
   type JsonRpcId,
 } from "./protocol.js";
 
@@ -135,14 +135,22 @@ export class JsonRpcProcessClient {
   }
 
   #handleLine(line: string): void {
-    let message: IncomingMessage;
+    let parsed: unknown;
     try {
-      message = JSON.parse(line) as IncomingMessage;
+      parsed = JSON.parse(line);
     } catch (error) {
       this.#rejectAll(
         new ProtocolError(`Invalid JSON from Codex App Server: ${line}`, {
           cause: error,
         }),
+      );
+      return;
+    }
+
+    const message = parseIncomingMessage(parsed);
+    if (!message) {
+      this.#rejectAll(
+        new ProtocolError("Invalid JSON-RPC message from Codex App Server"),
       );
       return;
     }

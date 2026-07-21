@@ -43,4 +43,22 @@ describe("JsonRpcProcessClient", () => {
       await client.close();
     }
   });
+
+  it.each(["malformed-scalar", "malformed-response"])(
+    "rejects malformed JSON-RPC output: %s",
+    async (method) => {
+      const client = new JsonRpcProcessClient({
+        command: process.execPath,
+        args: [mockServer],
+      });
+      await client.start();
+      try {
+        await expect(client.request(method)).rejects.toThrow(
+          /invalid JSON-RPC message/i,
+        );
+      } finally {
+        await client.close();
+      }
+    },
+  );
 });

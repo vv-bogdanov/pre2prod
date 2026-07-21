@@ -8,6 +8,10 @@ function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
+function sendRaw(message) {
+  process.stdout.write(`${message}\n`);
+}
+
 input.on("line", (line) => {
   const message = JSON.parse(line);
 
@@ -30,6 +34,16 @@ input.on("line", (line) => {
 
   if (message.method === "fail") {
     send({ id: message.id, error: { code: -32000, message: "mock failure" } });
+    return;
+  }
+
+  if (message.method === "malformed-scalar") {
+    sendRaw('"not a JSON-RPC message"');
+    return;
+  }
+
+  if (message.method === "malformed-response") {
+    send({ id: message.id, error: { code: -32000 } });
     return;
   }
 
