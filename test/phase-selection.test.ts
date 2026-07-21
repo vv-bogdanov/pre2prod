@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { describe, expect, it } from "vitest";
 
 import { Pre2prodError } from "../src/core/errors.js";
@@ -141,7 +143,7 @@ describe("phase selection", () => {
   });
 
   it("formats grouped phase list with stable grouping markers", () => {
-    const lines = formatPhaseList(groupedPhases);
+    const lines = formatPhaseList(groupedPhases).map(stripVTControlCharacters);
     const groups = lines.filter(
       (line) => line.length > 0 && !line.startsWith("  "),
     );

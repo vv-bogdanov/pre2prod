@@ -16,13 +16,18 @@ Pre2prod is a TypeScript CLI that uses Codex to improve an existing repository
 through a simple reviewer-led loop. One phase runs as follows:
 
 ```mermaid
-flowchart TD
+flowchart LR
     I["Initial review"] --> R["Phase review"]
     R --> B{"Blockers found?"}
-    B -- Yes --> P["/fork Worker<br/>plan (read-only)"]
+    B -- Yes --> P
     B -- No --> N["Next phase"]
-    P --> F["/goal Worker<br/>fix plan"]
     F --> R
+
+    subgraph W["Temporary Worker context"]
+        P["/fork Worker<br/>plan (read-only)"] --> F["/goal Worker<br/>fix plan"]
+    end
+
+    style W fill:#fff4cc,stroke:#b7791f,color:#111827
 ```
 
 ## Status

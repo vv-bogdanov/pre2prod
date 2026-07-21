@@ -1,3 +1,5 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConsoleProgressReporter } from "../src/progress.js";
@@ -28,7 +30,7 @@ describe("ConsoleProgressReporter", () => {
     reporter.thinking('{"blockers":["x"],"non_blockers":["y"]}', context);
 
     const lines = consoleSpy.mock.calls.flatMap((call) =>
-      String(call[0]).split("\n"),
+      stripVTControlCharacters(String(call[0])).split("\n"),
     );
     const joined = lines.join("\n");
     expect(lines).toContain(
