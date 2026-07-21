@@ -76,12 +76,28 @@ You can still use the full YAML format with `include`, `phases`, and object-styl
 pre2prod [instructions...]
 
 Options:
-  -C, --cwd <path>          repository directory
-  --model <model>           Codex model (default: gpt-5.6)
-  --max-iterations <n>      worker iterations per phase (default: 2)
-  --no-network              disable network for execution turns
-  --codex-bin <path>        Codex executable
-  --verbose                 stream model and command details
+  -C, --cwd <path>            repository directory
+  --model <model>             Codex model (default: gpt-5.6)
+  --max-iterations <n>        worker iterations per phase (default: 2)
+  --no-network                disable network for worker execution turns
+  --codex-bin <path>          Codex executable
+  -p, --phases <ids>          run only these phases (comma-separated, can be repeated)
+  -x, --exclude <ids>         exclude phases (comma-separated, can be repeated)
+  --list-phases               list phases (after include/exclude filters) and exit
+  --verbose                   show streamed model and command details
+```
+
+Examples:
+
+```bash
+# run only two phases
+pre2prod -C . -p testing,security
+
+# run all except security
+pre2prod -x security
+
+# show final phase list after filters
+pre2prod --list-phases -p testing,security -x security
 ```
 
 ## Development

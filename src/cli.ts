@@ -5,8 +5,14 @@ import process from "node:process";
 import { Command, InvalidArgumentError } from "commander";
 
 import { AppServerRuntime } from "./app-server/runtime.js";
+import { loadPhases } from "./phases.js";
 import { Pre2prodPipeline } from "./pipeline.js";
 import { ConsoleProgressReporter } from "./progress.js";
+import {
+  collectPhaseIds,
+  formatPhaseList,
+  selectPhases,
+} from "./phase-selection.js";
 
 const VERSION = "0.1.0";
 const program = new Command();
@@ -26,22 +32,50 @@ program
   )
   .option("--no-network", "Disable network access for worker execution turns")
   .option("--codex-bin <path>", "Codex executable", process.env.PRE2PROD_CODEX_BIN ?? "codex")
+  .option(
+    "-p, --phases <ids>",
+    "Run only these phases (comma-separated, can be repeated)",
+    collectPhaseIds,
+    [],
+  )
+  .option(
+    "-x, --exclude <ids>",
+    "Exclude phases (comma-separated, can be repeated)",
+    collectPhaseIds,
+    [],
+  )
+  .option("--list-phases", "List available phases and exit", false)
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliOptions) => {
     const cwd = resolve(options.cwd);
     const reporter = new ConsoleProgressReporter(options.verbose);
-    const runtime = new AppServerRuntime({
-      command: options.codexBin,
-      args: ["app-server"],
-      cwd,
-      model: options.model,
-      reporter,
-      clientVersion: VERSION,
-    });
-    const pipeline = new Pre2prodPipeline(runtime, reporter);
     const additionalInstructions = instructions.join(" ").trim();
 
     try {
+      const allPhases = await loadPhases(cwd);
+      const selectedPhases = selectPhases(
+        allPhases,
+        options.phases,
+        options.exclude,
+      );
+
+      if (options.listPhases) {
+        for (const phase of formatPhaseList(selectedPhases)) {
+          console.log(phase);
+        }
+        return;
+      }
+
+      const runtime = new AppServerRuntime({
+        command: options.codexBin,
+        args: ["app-server"],
+        cwd,
+        model: options.model,
+        reporter,
+        clientVersion: VERSION,
+      });
+      const pipeline = new Pre2prodPipeline(runtime, reporter, selectedPhases);
+
       await pipeline.run({
         cwd,
         model: options.model,
@@ -63,6 +97,9 @@ interface CliOptions {
   maxIterations: number;
   network: boolean;
   codexBin: string;
+  phases: string[];
+  exclude: string[];
+  listPhases: boolean;
   verbose: boolean;
 }
 
