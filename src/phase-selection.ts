@@ -78,16 +78,19 @@ export function formatPhaseList(
   phases: readonly Phase[],
   options: PhaseListOptions = {},
 ): string[] {
-  const groups = new Map<string, readonly Phase[]>();
+  const groups = new Map<string, { phase: Phase; displayTitle: string }[]>();
   for (const phase of phases) {
     const phaseId = phase.id;
     const prefix = phaseId.includes("-") ? phaseId.split("-")[0] ?? "" : phaseId;
     const group = toGroupName(prefix);
+    const displayTitle = stripGroupPrefix(phase.title, group);
     const list = groups.get(group) ?? [];
-    groups.set(group, [...list, phase]);
+    groups.set(group, [...list, { phase, displayTitle }]);
   }
 
   const output: string[] = [];
+  const allDisplayTitles = [...groups.values()].flat().map((entry) => entry.displayTitle);
+  const maxTitleLength = Math.max(...allDisplayTitles.map((title) => title.length), 0);
 
   let isFirstGroup = true;
   for (const [group, values] of groups) {
@@ -97,15 +100,8 @@ export function formatPhaseList(
     isFirstGroup = false;
 
     output.push(group);
-    const displayTitles = values.map((phase) => {
-      const displayTitle = stripGroupPrefix(phase.title, group);
-      return { phase, displayTitle };
-    });
-    const maxTitleLength = Math.max(
-      ...displayTitles.map(({ displayTitle }) => displayTitle.length),
-    );
 
-    displayTitles.forEach(({ phase, displayTitle }) => {
+    values.forEach(({ phase, displayTitle }) => {
       const paddedTitle = `${displayTitle}`.padEnd(maxTitleLength);
       const idCell = options.dimSlug ? pc.dim(phase.id) : phase.id;
       output.push(`  ${paddedTitle}   ${idCell}`);
