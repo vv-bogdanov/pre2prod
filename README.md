@@ -139,55 +139,63 @@ connection required by Codex App Server.
 
 ```text
 Foundation
-  Immediate Risk Triage
-  Reproducible Local Run
-  Core Scope & Critical Journeys
-  Critical Smoke Baseline
+  Immediate Risk Triage                   foundation-immediate-risk-triage
+  Reproducible Local Run                  foundation-reproducible-local-run
+  Core Scope & Critical Journeys          foundation-core-scope-critical-journeys
+  Critical Smoke Baseline                 foundation-critical-smoke-baseline
+
 Architecture
-  System Shape & Dependency Boundaries
-  Data Model & Persistence
-  Dead Code & Dependency Cleanup
-  Simplification & Deduplication
+  System Shape & Dependency Boundaries    architecture-system-shape-dependency-boundaries
+  Data Model & Persistence                architecture-data-model-persistence
+  Dead Code & Dependency Cleanup          architecture-dead-code-dependency-cleanup
+  Simplification & Deduplication          architecture-simplification-deduplication
+
 Correctness
-  Type Safety
-  Runtime Contracts
-  Error Handling
-  Failure Diagnostics
-  Data Integrity & Migrations
-  Consolidation & Cleanup
+  Type Safety                             correctness-type-safety
+  Runtime Contracts                       correctness-runtime-contracts
+  Error Handling                          correctness-error-handling
+  Failure Diagnostics                     correctness-failure-diagnostics
+  Data Integrity & Migrations             correctness-data-integrity-migrations
+  Consolidation & Cleanup                 correctness-consolidation-cleanup
+
 Product
-  UX Completeness
-  Accessibility
-  Interaction & UI Cleanup
+  UX Completeness                         product-ux-completeness
+  Accessibility                           product-accessibility
+  Interaction & UI Cleanup                product-interaction-ui-cleanup
+
 Verification
-  Core Unit & Invariants
-  Integration
-  Contracts & Compatibility
-  End-to-End Critical Journeys
-  Test Suite Cleanup & Stability
-  Static Analysis & Formatting
+  Core Unit & Invariants                  verification-core-unit-invariants
+  Integration                             verification-integration
+  Contracts & Compatibility               verification-contracts-compatibility
+  End-to-End Critical Journeys            verification-end-to-end-critical-journeys
+  Test Suite Cleanup & Stability          verification-test-suite-cleanup-stability
+  Static Analysis & Formatting            verification-static-analysis-formatting
+
 Operations
-  Observability
-  Reliability & Operability
-  Performance & Resource Efficiency
-  Instrumentation & Runtime Cleanup
+  Observability                           operations-observability
+  Reliability & Operability               operations-reliability-operability
+  Performance & Resource Efficiency       operations-performance-resource-efficiency
+  Instrumentation & Runtime Cleanup       operations-instrumentation-runtime-cleanup
+
 Assurance
-  Application Security Hardening
-  Privacy & Sensitive Data
-  Legal & Compliance Readiness
+  Application Security Hardening          assurance-application-security-hardening
+  Privacy & Sensitive Data                assurance-privacy-sensitive-data
+  Legal & Compliance Readiness            assurance-legal-compliance-readiness
+
 Cleanup
-  Dead Code & Unused Surface
-  Dependencies, Scripts & Configuration
-  Duplication & Consolidation
-  Temporary, Legacy & Debug Artifacts
-  Owned Code Reduction
+  Dead Code & Unused Surface              cleanup-dead-code-unused-surface
+  Dependencies, Scripts & Configuration   cleanup-dependencies-scripts-configuration
+  Duplication & Consolidation             cleanup-duplication-consolidation
+  Temporary, Legacy & Debug Artifacts     cleanup-temporary-legacy-debug-artifacts
+  Owned Code Reduction                    cleanup-owned-code-reduction
+
 Delivery
-  CI Quality Gates
-  Release Artifact Integrity
-  Secure Supply Chain
-  Deployment Readiness
-  Staging Verification
-  Documentation & Repository
+  CI Quality Gates                        delivery-ci-quality-gates
+  Release Artifact Integrity              delivery-release-artifact-integrity
+  Secure Supply Chain                     delivery-secure-supply-chain
+  Deployment Readiness                    delivery-deployment-readiness
+  Staging Verification                    delivery-staging-verification
+  Documentation & Repository              delivery-documentation-repository
 ```
 
 ## Custom phases
