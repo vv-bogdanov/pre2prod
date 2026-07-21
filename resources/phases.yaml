@@ -1,106 +1,198 @@
 # Wave 1: Foundation
 "Foundation: Immediate Risk Triage": |
-  Review only immediate stop-the-line risks before further work: exposed secrets or production credentials, destructive scripts, unsafe debug or admin access, obvious critical vulnerabilities, and accidental production connections. Ignore normal hardening at this stage.
+  Review only immediate stop-the-line risks before further work:
+  exposed secrets or production credentials, destructive scripts, unsafe
+  debug or admin access, obvious critical vulnerabilities, and accidental
+  production connections. Ignore normal hardening at this stage.
 
 "Foundation: Reproducible Local Run": |
-  Review whether the project can be installed, configured, and started from a clean local environment. Check runtime and package-manager consistency, lockfiles, environment examples, setup or migration steps, start commands, and machine-specific assumptions. Do not require production packaging yet.
+  Review whether the project can be installed, configured, and started from a clean
+  local environment. Check runtime and package-manager consistency, lockfiles,
+  environment examples, setup or migration steps, start commands, and
+  machine-specific assumptions. Do not require production packaging yet.
 
 "Foundation: Core Scope & Critical Journeys": |
-  Review whether the product's intended scope and critical user journeys are clear and coherent. Identify incomplete blockers, contradictory flows, and obsolete experiments that would distort later architecture. Do not expand the product or invent features.
+  Review whether the product's intended scope and critical user journeys are clear
+  and coherent. Identify incomplete blockers, contradictory flows, and obsolete
+  experiments that would distort later architecture. Do not expand the product or
+  invent features.
 
 "Foundation: Critical Smoke Baseline": |
-  Review whether a minimal black-box smoke suite protects the product's essential behavior before structural changes. Cover startup and only the most critical happy path, failure path, and side effect. Do not require broad coverage or implementation-detail tests.
+  Review whether a minimal black-box smoke suite protects the product's essential
+  behavior before structural changes. Cover startup and only the most critical
+  happy path, failure path, and side effect. Do not require broad coverage or
+  implementation-detail tests.
 
 # Wave 2: Architecture
 "Architecture: System Shape & Dependency Boundaries": |
-  Review whether the system shape and dependency boundaries support a coherent implementation and reasonable growth. Check the business core, side effects, external integrations, dependency direction, coupling, global state, and scale assumptions. Prefer the simplest viable architecture without ceremony.
+  Review whether the system shape and dependency boundaries support a coherent
+  implementation and reasonable growth. Check the business core, side effects,
+  external integrations, dependency direction, coupling, global state, and scale
+  assumptions. Prefer the simplest viable architecture without ceremony.
 
 "Architecture: Data Model & Persistence": |
-  Review whether the data model and persistence design fit the product and intended architecture. Check entities, ownership, identifiers, relationships, storage choices, transaction boundaries, tenancy, and data lifecycle. Allow necessary PoC redesign; avoid speculative stores.
+  Review whether the data model and persistence design fit the product and
+  intended architecture. Check entities, ownership, identifiers, relationships,
+  storage choices, transaction boundaries, tenancy, and data lifecycle. Allow
+  necessary PoC redesign; avoid speculative stores.
 
 "Architecture: Dead Code & Dependency Cleanup": |
-  Review for code, configuration, endpoints, flags, and dependencies that no longer support the chosen product and architecture. Remove only items that are confidently unused or obsolete.
+  Review for code, configuration, endpoints, flags, and dependencies that no
+  longer support the chosen product and architecture. Remove only items that are
+  confidently unused or obsolete.
 
 "Architecture: Simplification & Deduplication": |
-  Review the remaining design for avoidable complexity and duplication. Check repeated domain rules, parallel implementations, unnecessary abstractions, oversized flows, and inconsistent patterns. Simplify without changing intended behavior.
+  Review the remaining design for avoidable complexity and duplication. Check
+  repeated domain rules, parallel implementations, unnecessary abstractions,
+  oversized flows, and inconsistent patterns. Simplify without changing intended
+  behavior.
 
 # Wave 3: Correctness
 "Correctness: Type Safety": |
-  Review compile-time type safety. Check strictness, unsafe any or casts, nullability, domain states, exhaustiveness, and public or library boundaries. Strengthen types only where they prevent plausible defects.
+  Review compile-time type safety. Check strictness, unsafe any or casts,
+  nullability, domain states, exhaustiveness, and public or library boundaries.
+  Strengthen types only where they prevent plausible defects.
 
 "Correctness: Runtime Contracts": |
-  Review validation at untrusted runtime boundaries: environment, requests, files, database data, external APIs, queues, webhooks, and model output. Require explicit parsing, defaults, or rejection where invalid data can break behavior.
+  Review validation at untrusted runtime boundaries: environment, requests,
+  files, database data, external APIs, queues, webhooks, and model output.
+  Require explicit parsing, defaults, or rejection where invalid data can break
+  behavior.
 
 "Correctness: Error Handling": |
-  Review whether failures are handled correctly. Check propagation, causes, expected versus unexpected errors, partial operations, statuses or exit codes, user-safe messages, and justified retries or fallbacks. Do not build full observability here.
+  Review whether failures are handled correctly. Check propagation, causes,
+  expected versus unexpected errors, partial operations, statuses or exit
+  codes, user-safe messages, and justified retries or fallbacks. Do not build full
+  observability here.
 
 "Correctness: Failure Diagnostics": |
-  Review whether concrete failures can be diagnosed quickly. Check stack traces, source maps, stable error codes, operation context, actionable messages, and correlation identifiers where useful. Do not add full telemetry in this phase.
+  Review whether concrete failures can be diagnosed quickly. Check stack traces,
+  source maps, stable error codes, operation context, actionable messages, and
+  correlation identifiers where useful. Do not add full telemetry in this phase.
 
 "Correctness: Data Integrity & Migrations": |
-  Review persisted-data safety after the model has stabilized. Check constraints, uniqueness, transactions, concurrency, idempotency, migrations, safe reruns, partial failures, and backup or restore expectations. Pass when the project has no persistent data.
+  Review persisted-data safety after the model has stabilized. Check constraints,
+  uniqueness, transactions, concurrency, idempotency, migrations, safe reruns,
+  partial failures, and backup or restore expectations. Pass when the project has
+  no persistent data.
 
 # Wave 4: Product
 "Product: UX Completeness": |
-  Review completion of critical user-facing states and journeys. Check loading, empty, error, success, validation feedback, destructive confirmations, recovery, responsiveness, and equivalent CLI behavior where relevant. Do not add nonessential features.
+  Review completion of critical user-facing states and journeys. Check loading,
+  empty, error, success, validation feedback, destructive confirmations, recovery,
+  responsiveness, and equivalent CLI behavior where relevant. Do not add
+  nonessential features.
 
 "Product: Accessibility": |
-  Review material accessibility issues in the actual user interface. Check keyboard and focus behavior, semantics and labels, contrast, error communication, motion or timing, and basic screen-reader support. Adapt or pass for non-UI projects.
+  Review material accessibility issues in the actual user interface. Check keyboard
+  and focus behavior, semantics and labels, contrast, error communication,
+  motion or timing, and basic screen-reader support. Adapt or pass for non-UI
+  projects.
 
 # Wave 5: Verification
 "Verification: Core Unit & Invariants": |
-  Review whether critical business logic and invariants have focused deterministic tests. Check branches, boundaries, invalid states, calculations, transitions, and permissions. Seek high coverage only for small critical pure-core code.
+  Review whether critical business logic and invariants have focused deterministic
+  tests. Check branches, boundaries, invalid states, calculations, transitions,
+  and permissions. Seek high coverage only for small critical pure-core code.
 
 "Verification: Integration": |
-  Review tests across real infrastructure boundaries such as databases, filesystems, caches, queues, migrations, external adapters, auth middleware, and process execution. Require representative success and failure coverage without duplicating unit tests.
+  Review tests across real infrastructure boundaries such as databases,
+  filesystems, caches, queues, migrations, external adapters, auth middleware,
+  and process execution. Require representative success and failure coverage
+  without duplicating unit tests.
 
 "Verification: Contracts & Compatibility": |
-  Review contracts consumed by other components or users: HTTP schemas, events, webhooks, CLI output and exit codes, stored formats, and package exports. Protect intended compatibility without preserving accidental PoC internals.
+  Review contracts consumed by other components or users: HTTP schemas, events,
+  webhooks, CLI output and exit codes, stored formats, and package exports.
+  Protect intended compatibility without preserving accidental PoC internals.
 
 "Verification: End-to-End Critical Journeys": |
-  Review a small set of critical journeys through the complete system. Cover startup, the core value flow, auth or permissions, financial or destructive actions, and recovery where relevant. Avoid exhaustive UI permutations.
+  Review a small set of critical journeys through the complete system. Cover
+  startup, the core value flow, auth or permissions, financial or destructive
+  actions, and recovery where relevant. Avoid exhaustive UI permutations.
 
 "Verification: Test Suite Quality & Stability": |
-  Review whether the test suite is trustworthy and fast enough to support change. Check flakiness, order dependence, shared state, weak assertions, excessive mocks, skipped or focused tests, slowness, and unstable selectors.
+  Review whether the test suite is trustworthy and fast enough to support change.
+  Check flakiness, order dependence, shared state, weak assertions, excessive
+  mocks, skipped or focused tests, slowness, and unstable selectors.
 
 "Verification: Static Analysis & Formatting": |
-  Review lightweight automated formatting and static checks for the now-stable codebase. Configure compatible formatter, linter, imports, and useful analysis with minimal friction. Avoid conflicting tools, style churn, or rules that fight the framework.
+  Review lightweight automated formatting and static checks for the now-stable
+  codebase. Configure compatible formatter, linter, imports, and useful analysis
+  with minimal friction. Avoid conflicting tools, style churn, or rules that
+  fight the framework.
 
 # Wave 6: Operations
 "Operations: Observability": |
-  Review whether production behavior can be understood through appropriate logs, metrics, and traces. Check structured context, correlation, key errors, latency, dependencies, business events, and sensitive-data redaction. Avoid vendor lock-in and telemetry overkill.
+  Review whether production behavior can be understood through appropriate logs,
+  metrics, and traces. Check structured context, correlation, key errors,
+  latency, dependencies, business events, and sensitive-data redaction. Avoid
+  vendor lock-in and telemetry overkill.
 
 "Operations: Reliability & Operability": |
-  Review lifecycle and failure resilience. Check startup, health or readiness, graceful shutdown, timeouts, retries and backoff, idempotency, resource and concurrency limits, dependency outages, and recovery. Require only mechanisms relevant to this architecture.
+  Review lifecycle and failure resilience. Check startup, health or readiness,
+  graceful shutdown, timeouts, retries and backoff, idempotency, resource and
+  concurrency limits, dependency outages, and recovery. Require only mechanisms
+  relevant to this architecture.
 
 "Operations: Performance & Resource Efficiency": |
-  Review measured performance and resource risks. Check latency, startup, memory, CPU, query count, bundle or image size, network calls, and concurrency. Optimize only evidenced bottlenecks; do not perform speculative optimization.
+  Review measured performance and resource risks. Check latency, startup, memory,
+  CPU, query count, bundle or image size, network calls, and concurrency. Optimize
+  only evidenced bottlenecks; do not perform speculative optimization.
 
 # Wave 7: Assurance
 "Assurance: Application Security Hardening": |
-  Review the final application attack surface. Check authentication, authorization, tenancy, input and output handling, sessions, injection, SSRF, path traversal, uploads, rate limits, webhooks, and sensitive logging. Fix material exploitable risks, not irrelevant checklist items.
+  Review the final application attack surface. Check authentication,
+  authorization, tenancy, input and output handling, sessions, injection,
+  SSRF, path traversal, uploads, rate limits, webhooks, and sensitive logging.
+  Fix material exploitable risks, not irrelevant checklist items.
 
 "Assurance: Privacy & Sensitive Data": |
-  Review actual collection, storage, transmission, logging, and deletion of sensitive data. Check minimization, consent, cookies, analytics, retention, export or deletion, redaction, test data, and third parties. Base requirements on real data flows.
+  Review actual collection, storage, transmission, logging, and deletion of
+  sensitive data. Check minimization, consent, cookies, analytics, retention,
+  export or deletion, redaction, test data, and third parties. Base
+  requirements on real data flows.
 
 "Assurance: Legal & Compliance Readiness": |
-  Review legal and compliance-facing readiness. Check licenses and notices, privacy, terms, cookies, age or industry disclaimers, processor disclosures, and jurisdiction assumptions. Prepare necessary drafts and open items without claiming certification.
+  Review legal and compliance-facing readiness. Check licenses and notices,
+  privacy, terms, cookies, age or industry disclaimers, processor disclosures,
+  and jurisdiction assumptions. Prepare necessary drafts and open items without
+  claiming certification.
 
 # Wave 8: Delivery
 "Delivery: CI Quality Gates": |
-  Review whether the stable checks the project now relies on run automatically before merge or release. Include only relevant install, formatting, lint, type, test, security, and build commands. Keep feedback fast and configuration minimal.
+  Review whether the stable checks the project now relies on run automatically
+  before merge or release. Include only relevant install, formatting, lint,
+  type, test, security, and build commands. Keep feedback fast and
+  configuration minimal.
 
 "Delivery: Release Artifact Integrity": |
-  Review whether a distributable artifact can be built, tested, and versioned reproducibly. Check package or container contents, production dependencies, startup, metadata, versioning, source maps, and size. Do not impose containers when the target platform does not need them.
+  Review whether a distributable artifact can be built, tested, and versioned
+  reproducibly. Check package or container contents, production dependencies,
+  startup, metadata, versioning, source maps, and size. Do not impose containers
+  when the target platform does not need them.
 
 "Delivery: Secure Supply Chain": |
-  Review dependencies and the build or release chain. Check vulnerability and secret scanning, lifecycle scripts, lockfile integrity, CI permissions, pinned actions or images, and SBOM, provenance, or signing where justified. Avoid unsupported enterprise ceremony.
+  Review dependencies and the build or release chain. Check vulnerability and
+  secret scanning, lifecycle scripts, lockfile integrity, CI permissions, pinned
+  actions or images, and SBOM, provenance, or signing where justified. Avoid
+  unsupported enterprise ceremony.
 
 "Delivery: Deployment Readiness": |
-  Review readiness for a simple staging target. Prefer an existing target or the simplest suitable managed platform; check configuration, environment and secrets, services, migrations, health, deployment, and rollback instructions. Without credentials, prepare everything local and leave the external step non-blocking.
+  Review readiness for a simple staging target. Prefer an existing target or the
+  simplest suitable managed platform; check configuration, environment and
+  secrets, services, migrations, health, deployment, and rollback instructions.
+  Without credentials, prepare everything local and leave the external step
+  non-blocking.
 
 "Delivery: Staging Verification": |
-  Review the deployed staging environment when accessible, otherwise review the prepared verification procedure. Check smoke or critical E2E flows, migrations, health, headers, telemetry, and recovery or rollback. Missing credentials alone are not a blocker when preparation is complete.
+  Review the deployed staging environment when accessible, otherwise review the
+  prepared verification procedure. Check smoke or critical E2E flows,
+  migrations, health, headers, telemetry, and recovery or rollback.
+  Missing credentials alone are not a blocker when preparation is complete.
 
 "Delivery: Documentation & Repository": |
-  Review whether another person can understand, run, test, deploy, operate, and maintain the project. Check README, quick start, architecture, environment, testing, deployment, rollback, troubleshooting, security, limitations, license, contribution guidance, and badges backed by real checks.
+  Review whether another person can understand, run, test, deploy, operate, and
+  maintain the project. Check README, quick start, architecture, environment,
+  testing, deployment, rollback, troubleshooting, security, limitations, license,
+  contribution guidance, and badges backed by real checks.
