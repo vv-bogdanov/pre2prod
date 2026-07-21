@@ -84,7 +84,6 @@ Options:
   -p, --phases <ids>          run only these phases (comma-separated, can be repeated)
   -x, --exclude <ids>         exclude phases (comma-separated, can be repeated)
   -l, --list                  list phases (after include/exclude filters) and exit
-  -l, --list-phases           list phases (after include/exclude filters) and exit (legacy alias)
   --verbose                   show streamed model and command details
 ```
 
