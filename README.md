@@ -1,4 +1,14 @@
-# Pre2prod
+# Pre2prod  💩→🍭
+
+From vibe-coded PoC to production-ready MVP.
+
+>Thousands of new products are vibe-coded every day,
+>but only a small fraction ever reach production.
+
+Pre2Prod closes that gap with a carefully designed,
+best-practice workflow that progressively restructures,
+validates, tests, hardens, and prepares a repository
+for deployment — almost automatically.
 
 **One command. A sequence of expert reviews. A repository prepared for real staging.**
 
