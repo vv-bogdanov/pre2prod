@@ -43,7 +43,7 @@ export interface ThreadGoalQueryResult {
   goal: ThreadGoal | null;
 }
 
-export type SandboxMode = "read-only" | "workspace-write";
+export type SandboxMode = "readOnly" | "workspaceWrite";
 
 export interface TurnRequest {
   threadId: string;

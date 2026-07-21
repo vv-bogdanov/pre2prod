@@ -116,7 +116,7 @@ export class AppServerRuntime implements AgentRuntime {
         cwd: options.cwd,
         model: options.model ?? this.#model,
         approvalPolicy: "never",
-        sandbox: "read-only",
+        sandbox: "readOnly",
         serviceName: "pre2prod",
       },
     );
@@ -168,10 +168,10 @@ export class AppServerRuntime implements AgentRuntime {
         cwd: request.cwd,
         approvalPolicy: "never",
         sandboxPolicy:
-          request.sandbox === "read-only"
-            ? { type: "read-only" }
+          request.sandbox === "readOnly"
+            ? { type: "readOnly" }
             : {
-                type: "workspace-write",
+                type: "workspaceWrite",
                 writableRoots: [request.cwd],
                 networkAccess: request.networkAccess ?? true,
               },
