@@ -18,7 +18,7 @@ The automated suite validates orchestration against a protocol-faithful mock pro
       retried until Codex returned 401 Unauthorized. No credentials were used.
 - [x] Run `pnpm run validate` in the writable workspace with temporary test
       files confined to `.pre2prod/test-tmp-run`: formatting, typechecking,
-      linting, build, 92 tests, and coverage thresholds passed.
+      linting, build, 101 tests, and coverage thresholds passed.
 - [x] Confirm `codex app-server` starts over stdio: the disposable CLI run
       emitted App Server warnings and JSON-RPC telemetry before the blocked
       Reviewer turn.

@@ -32,7 +32,10 @@ flowchart LR
 
 ## Status
 
-This is a hackathon MVP scaffold. The orchestration, App Server client, prompts, Git checkpoints, explicit-only Codex Skill at `.agents/skills/pre2prod/`, mocks, and automated tests are implemented. Live compatibility still needs to be verified against the installed Codex CLI version.
+This is a hackathon MVP. The orchestration, App Server client, prompts, Git
+checkpoints, explicit-only Codex Skill at `.agents/skills/pre2prod/`, mocks, and
+automated tests are implemented. Live compatibility still needs to be verified
+against the installed Codex CLI version.
 
 ## Requirements
 
@@ -339,6 +342,5 @@ Please report suspected vulnerabilities privately as described in
 other sensitive data in a public issue.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
-[`docs/PREPROD_SPEC_RU.md`](docs/PREPROD_SPEC_RU.md),
-[`CONTRIBUTING.md`](CONTRIBUTING.md), [`RELEASING.md`](RELEASING.md), and
-[`HANDOFF.md`](HANDOFF.md).
+[`docs/LIVE_COMPATIBILITY_CHECKLIST.md`](docs/LIVE_COMPATIBILITY_CHECKLIST.md),
+[`CONTRIBUTING.md`](CONTRIBUTING.md), and [`RELEASING.md`](RELEASING.md).

@@ -7,12 +7,12 @@ Reviewer thread (persistent for the whole run)
   ├─ discovery turn
   ├─ phase review turn
   │    └─ fork Worker at this completed turn
-  │          ├─ planning turn writes PRE2PROD_PLAN.md
+  │          ├─ planning turn returns the remediation plan
+  │          ├─ CLI writes PRE2PROD_PLAN.md
   │          ├─ set Worker execution goal
   │          └─ execution turn implements the plan
   ├─ clear Worker goal after execution
   ├─ re-review turn on the original Reviewer thread
-  ├─ clear Reviewer goal after each review pass/attempt
   └─ next phase
 ```
 
@@ -26,10 +26,11 @@ or merged back into the Reviewer, and the App Server process closes at run end.
 
 - `AppServerRuntime`: small typed subset of Codex App Server JSON-RPC over stdio.
 - `Pre2prodPipeline`: explicit sequential orchestration.
-- `phases.ts`: ordered reviewer prompts.
+- `phases.ts`: ordered reviewer prompts loaded from project, home, or bundled YAML.
 - `prompts.ts`: shared and role-specific instructions.
 - `git.ts`: required branch/checkpoint support; workflow requires running in a git repository.
-- `PRE2PROD_PLAN.md`: single plan file overwritten by each Worker iteration.
+- `PRE2PROD_PLAN.md`: transient plan file written by the CLI and archived after
+  the phase.
 
 ## Protocol compatibility
 
