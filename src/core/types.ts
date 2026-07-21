@@ -17,6 +17,35 @@ export interface ThreadRef {
   sessionId?: string;
 }
 
+export type ThreadGoalStatus =
+  | "active"
+  | "paused"
+  | "blocked"
+  | "usageLimited"
+  | "budgetLimited"
+  | "complete";
+
+export interface ThreadGoal {
+  threadId: string;
+  objective: string;
+  status: ThreadGoalStatus;
+  tokenBudget: number | null;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ThreadGoalRequest {
+  objective?: string | undefined;
+  status?: ThreadGoalStatus | undefined;
+  tokenBudget?: number | undefined;
+}
+
+export interface ThreadGoalQueryResult {
+  goal: ThreadGoal | null;
+}
+
 export type SandboxMode = "readOnly" | "workspaceWrite";
 
 export interface TurnRequest {
@@ -42,6 +71,9 @@ export interface AgentRuntime {
   startThread(options: { cwd: string; model?: string }): Promise<ThreadRef>;
   forkThread(threadId: string, lastTurnId: string): Promise<ThreadRef>;
   runTurn(request: TurnRequest): Promise<TurnResult>;
+  setThreadGoal(threadId: string, goal: ThreadGoalRequest): Promise<ThreadGoal>;
+  getThreadGoal(threadId: string): Promise<ThreadGoal | null>;
+  clearThreadGoal(threadId: string): Promise<boolean>;
   close(): Promise<void>;
 }
 
