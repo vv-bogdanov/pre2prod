@@ -5,7 +5,15 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **A reviewer-led Codex CLI that turns an existing repository into a
-production-ready MVP, one readiness phase at a time.**
+production-ready MVP**
+
+> Thousands of new products are vibe-coded every day,
+> but only a small fraction ever reach production.
+>
+> Pre2Prod closes that gap with a carefully designed,
+> best-practice workflow that progressively restructures,
+> validates, tests, hardens, and prepares a repository
+> for deployment — almost automatically.
 
 Pre2prod reviews the real repository, fixes material gaps through temporary
 Worker agents, verifies every change independently, and records phase
