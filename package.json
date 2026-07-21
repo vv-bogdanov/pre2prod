@@ -2,6 +2,14 @@
   "name": "pre2prod",
   "version": "0.1.0",
   "description": "Reviewer-led CLI that prepares existing repositories for staging and production-oriented use.",
+  "homepage": "https://github.com/vv-bogdanov/pre2prod#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vv-bogdanov/pre2prod.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vv-bogdanov/pre2prod/issues"
+  },
   "type": "module",
   "bin": {
     "pre2prod": "./bin/pre2prod.js"
@@ -19,6 +27,8 @@
     "bin",
     "resources",
     "README.md",
+    "CONTRIBUTING.md",
+    "RELEASING.md",
     "SECURITY.md",
     "LICENSE"
   ],
@@ -34,7 +44,9 @@
     "test": "pnpm run build && vitest run",
     "test:watch": "vitest",
     "test:coverage": "pnpm run build && vitest run --coverage",
-    "pack:check": "pnpm pack --pack-destination .pre2prod/pack-check",
+    "audit:prod": "pnpm audit --prod --audit-level high",
+    "pack:check": "node scripts/package-check.mjs",
+    "release:check": "pnpm run validate && pnpm run audit:prod && pnpm run pack:check",
     "clean": "node scripts/clean.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

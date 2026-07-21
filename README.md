@@ -170,14 +170,15 @@ pre2prod logs --full --tag p=3/12 --run-id 2026-07-21-...
 ## Development
 
 ```bash
-pnpm run validate
-pnpm run pack:check
+pnpm run release:check
 ```
 
 Current automated baseline:
 
 - formatting, typechecking, linting, test coverage, and TypeScript build;
-- package-content verification with the repository's pinned pnpm version.
+- production dependency audit;
+- tarball creation, clean npm installation, and installed CLI smoke with the
+  repository's pinned pnpm version.
 
 Tests include:
 
@@ -208,6 +209,18 @@ For one-off local runs without global install:
 ```bash
 node dist/cli.js --list -C /path/to/project
 ```
+
+## Troubleshooting
+
+- `ERR_PNPM_NO_GLOBAL_BIN_DIR`: run `pnpm setup`, restart the shell, and confirm
+  `PNPM_HOME` is on `PATH`; use `node dist/cli.js` while developing if global
+  linking is unavailable.
+- Codex authentication, sandbox, or protocol failures: inspect the terminal and
+  `pre2prod logs`, then compare the installed version with
+  `docs/LIVE_COMPATIBILITY_CHECKLIST.md`.
+- Long-running turns: raise `--turn-timeout`; the default is 120 minutes.
+- Dirty-tree errors: review `git status` and commit or stash user changes.
+  Pre2prod never stashes or cleans them automatically.
 
 ## Safety boundaries
 
@@ -240,4 +253,7 @@ Please report suspected vulnerabilities privately as described in
 [`SECURITY.md`](SECURITY.md). Do not include credentials, private source, or
 other sensitive data in a public issue.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PREPROD_SPEC_RU.md`](docs/PREPROD_SPEC_RU.md), and [`HANDOFF.md`](HANDOFF.md).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
+[`docs/PREPROD_SPEC_RU.md`](docs/PREPROD_SPEC_RU.md),
+[`CONTRIBUTING.md`](CONTRIBUTING.md), [`RELEASING.md`](RELEASING.md), and
+[`HANDOFF.md`](HANDOFF.md).

@@ -35,6 +35,8 @@ a consolidated report and recommendations for the CLI's MVP scope.
 - Store reports in `.pre2prod/reports/`. The CLI archives successful Worker
   plans in `.pre2prod/plans`; preserve failed-phase root plans in reports before
   modifying or removing them.
+- At the user's direction, the final Operations/Assurance and Delivery phases
+  were reviewed and remediated manually on `main` after automated waves stopped.
 
 ## Preparation
 
@@ -49,19 +51,19 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 ## Wave Procedure
 
-- [ ] Start a wave from the clean dogfood branch with its selected phase group,
+- [x] Start a wave from the clean dogfood branch with its selected phase group,
       the configured model and iteration limit, and without `--no-commit`.
-- [ ] Record the wave branch, run ID, model/provider, selected phases, and
+- [x] Record the wave branch, run ID, model/provider, selected phases, and
       result.
-- [ ] If it passes, inspect each checkpoint commit, `git diff` from the wave
+- [x] If it passes, inspect each checkpoint commit, `git diff` from the wave
       base, archived plans, and summary/full logs grouped by phase and turn.
-- [ ] Independently verify material Worker claims and run validation relevant to
+- [x] Independently verify material Worker claims and run validation relevant to
       the combined wave diff.
-- [ ] Write one ignored report per phase from its commit and logs, including
+- [x] Write one ignored report per phase from its commit and logs, including
       recommendations and the commit decision.
-- [ ] Rebuild the CLI after accepting the wave, then merge it into the dogfood
+- [x] Rebuild the CLI after accepting the wave, then merge it into the dogfood
       branch before the next wave.
-- [ ] If it stops, inspect the failing phase's root plan, diff, and logs; fix
+- [x] If it stops, inspect the failing phase's root plan, diff, and logs; fix
       confirmed Pre2prod bugs with focused tests and rerun that phase before
       resuming the wave plan.
 
@@ -117,19 +119,19 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 ### Delivery
 
-- [ ] `delivery-ci-quality-gates` — CI Quality Gates
-- [ ] `delivery-release-artifact-integrity` — Release Artifact Integrity
-- [ ] `delivery-secure-supply-chain` — Secure Supply Chain
-- [ ] `delivery-deployment-readiness` — Deployment Readiness
-- [ ] `delivery-staging-verification` — Staging Verification
-- [ ] `delivery-documentation-repository` — Documentation & Repository
+- [x] `delivery-ci-quality-gates` — CI Quality Gates
+- [x] `delivery-release-artifact-integrity` — Release Artifact Integrity
+- [x] `delivery-secure-supply-chain` — Secure Supply Chain
+- [x] `delivery-deployment-readiness` — Deployment Readiness
+- [x] `delivery-staging-verification` — Staging Verification
+- [x] `delivery-documentation-repository` — Documentation & Repository
 
 ## Final Review
 
-- [ ] Read every phase report and compare repeated findings across phases.
-- [ ] Review all fixes made to Pre2prod during the flight.
-- [ ] Run `pnpm run validate`.
-- [ ] Produce a consolidated report covering pipeline correctness, Git safety,
+- [x] Read every phase report and compare repeated findings across phases.
+- [x] Review all fixes made to Pre2prod during the flight.
+- [x] Run `pnpm run validate`.
+- [x] Produce a consolidated report covering pipeline correctness, Git safety,
       observability, diagnostics, phase and prompt quality, test gaps,
       documentation, and deferred work.
-- [ ] Prioritize final recommendations by demonstrated risk and repeated evidence.
+- [x] Prioritize final recommendations by demonstrated risk and repeated evidence.
