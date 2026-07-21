@@ -17,7 +17,7 @@ The starter implementation is complete and validated against a mock Codex App Se
 - required Git branch and checkpoint commits (run fails with `git init` instruction when repo is missing).
 - explicit-only Codex Skill;
 - unit, integration, JSONL protocol, Git, and full mock pipeline tests;
-- npm build and package validation.
+- pnpm build and package validation.
 
 ## Required next step
 
@@ -28,7 +28,7 @@ Verify the implementation against the exact Codex CLI version used for the hacka
 3. Generate matching protocol types:
 
    ```bash
-   npm run codex:schemas
+   pnpm run codex:schemas
    ```
 
 4. Compare the generated types with the intentionally small protocol subset in `src/app-server/`.
@@ -46,9 +46,10 @@ Verify the implementation against the exact Codex CLI version used for the hacka
 ## Commands
 
 ```bash
-npm ci
-npm run validate
-npm run build
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run validate
+pnpm run build
 node dist/cli.js --help
 ```
 

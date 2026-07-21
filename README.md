@@ -20,13 +20,15 @@ This is a hackathon MVP scaffold. The orchestration, App Server client, prompts,
 
 ## Requirements
 
-- Node.js 20+
+- Node.js >=20.19.0
+- Corepack-managed pnpm 10.14.0 (the version pinned in `packageManager`)
 - an installed and authenticated Codex CLI with `codex app-server`
 
 ## Install and run
 
 ```bash
-pnpm install
+corepack enable
+pnpm install --frozen-lockfile
 pnpm run build
 node dist/cli.js
 ```
