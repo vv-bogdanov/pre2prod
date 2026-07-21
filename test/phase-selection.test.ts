@@ -14,6 +14,13 @@ const phases: readonly Phase[] = [
   { id: "testing", title: "Testing", reviewerPrompt: "x" },
   { id: "security", title: "Security", reviewerPrompt: "x" },
 ];
+const groupedPhases: readonly Phase[] = [
+  { id: "foundation-initial-risk", title: "Foundation: Initial Risk", reviewerPrompt: "x" },
+  { id: "foundation-local-run", title: "Foundation: Local Run", reviewerPrompt: "x" },
+  { id: "architecture-system-shape", title: "Architecture: System Shape", reviewerPrompt: "x" },
+  { id: "architecture-data-model", title: "Architecture: Data Model", reviewerPrompt: "x" },
+  { id: "verification-type-safety", title: "Verification: Type Safety", reviewerPrompt: "x" },
+];
 
 describe("phase selection", () => {
   it("selects all phases by default", () => {
@@ -50,10 +57,31 @@ describe("phase selection", () => {
     ]);
   });
 
+  it("selects phases by group prefix", () => {
+    expect(selectPhases(groupedPhases, ["architecture"], [])).toEqual([
+      groupedPhases[2],
+      groupedPhases[3],
+    ]);
+  });
+
+  it("supports mixed exact and prefix selectors in include order", () => {
+    expect(
+      selectPhases(groupedPhases, ["verification", "architecture-system-shape"]),
+    ).toEqual([groupedPhases[4], groupedPhases[2]]);
+  });
+
   it("excludes selected phases", () => {
     expect(selectPhases(phases, [], ["security"])).toEqual([
       phases[0],
       phases[1],
+    ]);
+  });
+
+  it("excludes phases by group prefix", () => {
+    expect(selectPhases(groupedPhases, [], ["foundation"])).toEqual([
+      groupedPhases[2],
+      groupedPhases[3],
+      groupedPhases[4],
     ]);
   });
 

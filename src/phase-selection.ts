@@ -22,13 +22,22 @@ export function selectPhases(
 ): readonly Phase[] {
   const availableById = new Map(allPhases.map((phase) => [phase.id, phase]));
   const availableIds = [...availableById.keys()];
+  const phaseLookup = new Set(availableIds);
 
   if (include.length > 0 && include.some((id) => PHASE_ALL_ALIASES.has(id))) {
     include = include.filter((id) => !PHASE_ALL_ALIASES.has(id));
   }
 
-  const includedIds = include.length > 0 ? include : availableIds;
-  validateKnownIds("--phases", includedIds, availableIds);
+  const includeResolution =
+    include.length > 0
+      ? resolveSelectorsToPhaseIds(include, allPhases, phaseLookup)
+      : null;
+
+  const includedIds =
+    includeResolution ? includeResolution.resolvedIds : availableIds;
+  if (include.length > 0) {
+    validateKnownIds("--phases", availableIds, includeResolution?.unmatchedSelectors ?? []);
+  }
 
   const selected = include.length === 0
     ? [...allPhases]
@@ -40,8 +49,16 @@ export function selectPhases(
       return phase;
     });
 
-  const excludeSet = new Set(exclude.map((id) => id.trim().toLowerCase()).filter(Boolean));
-  validateKnownIds("--exclude", [...excludeSet], availableIds);
+  const excludeResolution = exclude.length > 0
+    ? resolveSelectorsToPhaseIds(exclude, allPhases, phaseLookup)
+    : null;
+
+  const resolvedExcludes = excludeResolution ? excludeResolution.resolvedIds : [];
+  if (exclude.length > 0) {
+    validateKnownIds("--exclude", availableIds, excludeResolution?.unmatchedSelectors ?? []);
+  }
+
+  const excludeSet = new Set(resolvedExcludes.map((id) => id.trim().toLowerCase()).filter(Boolean));
 
   const result = selected.filter((phase) => !excludeSet.has(phase.id));
 
@@ -69,20 +86,58 @@ function uniqueFromSource(items: readonly string[]): readonly string[] {
   return result;
 }
 
-function validateKnownIds(flag: string, ids: readonly string[], availableIds: readonly string[]): void {
-  if (ids.length === 0) {
-    return;
+function resolveSelectorsToPhaseIds(
+  selectors: readonly string[],
+  allPhases: readonly Phase[],
+  available: Set<string>,
+): { readonly resolvedIds: string[]; readonly unmatchedSelectors: string[] } {
+  const resolved: string[] = [];
+  const seen = new Set<string>();
+  const unmatched: string[] = [];
+
+  for (const selector of selectors) {
+    const normalized = selector.trim().toLowerCase();
+    if (!normalized) {
+      continue;
+    }
+
+    let matched = false;
+    if (available.has(normalized)) {
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        resolved.push(normalized);
+      }
+      matched = true;
+    }
+
+    const prefix = `${normalized}-`;
+    for (const phase of allPhases) {
+      if (phase.id.startsWith(prefix) && !seen.has(phase.id)) {
+        seen.add(phase.id);
+        resolved.push(phase.id);
+        matched = true;
+      }
+    }
+
+    if (!matched) {
+      unmatched.push(normalized);
+    }
   }
 
-  const known = new Set(availableIds);
-  const unknown = ids.filter((id) => !known.has(id));
-  if (unknown.length === 0) {
+  return { resolvedIds: resolved, unmatchedSelectors: unmatched };
+}
+
+function validateKnownIds(
+  flag: string,
+  selectors: readonly string[],
+  unmatchedSelectors: readonly string[],
+): void {
+  if (unmatchedSelectors.length === 0) {
     return;
   }
 
   throw new Pre2prodError(
-    `${flag} references unknown phase id(s): ${unknown.join(", ")}.
-` +
-      `Available ids: ${availableIds.join(", ")}`,
+    `${flag} references unknown phase id(s): ${unmatchedSelectors.join(", ")}.
+Available ids: ${selectors.join(", ")}`,
   );
 }

@@ -81,8 +81,8 @@ Options:
   --max-iterations <n>        worker iterations per phase (default: 2)
   --no-network                disable network for worker execution turns
   --codex-bin <path>          Codex executable
-  -p, --phases <ids>          run only these phases (comma-separated, can be repeated)
-  -x, --exclude <ids>         exclude phases (comma-separated, can be repeated)
+  -p, --phases <ids>          run only these phases (id or group prefix, comma-separated, can be repeated)
+  -x, --exclude <ids>         exclude phases (id or group prefix, comma-separated, can be repeated)
   -l, --list                  list phases (after include/exclude filters) and exit
   --verbose                   show streamed model and command details
 ```
@@ -93,8 +93,14 @@ Examples:
 # run only two phases
 pre2prod -C . -p testing,security
 
+# run all Architecture phases (prefix-based group selection)
+pre2prod -C . -p architecture
+
 # run all except security
 pre2prod -x security
+
+# run Foundation and Verification, but skip one verification phase
+pre2prod -p foundation,verification -x verification-type-safety
 
 # show final phase list after filters
 pre2prod --list -p testing,security -x security
