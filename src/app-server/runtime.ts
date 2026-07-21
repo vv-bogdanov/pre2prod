@@ -4,6 +4,7 @@ import type {
   ThreadGoalRequest,
   ProgressReporter,
   ThreadRef,
+  TurnLogContext,
   TurnRequest,
   TurnResult,
 } from "../core/types.js";
@@ -12,6 +13,7 @@ import {
   JsonRpcProcessClient,
   type JsonRpcClientOptions,
 } from "./json-rpc-client.js";
+import type { RunLogger } from "../logging.js";
 
 interface ThreadResponse {
   thread: {
@@ -44,6 +46,8 @@ interface TurnCollector {
   text: string;
   diff: string | undefined;
   usage: Record<string, unknown> | undefined;
+  threadId: string;
+  logContext: TurnLogContext | undefined;
   resolve(result: TurnResult): void;
   reject(reason: unknown): void;
 }
@@ -52,6 +56,7 @@ export interface AppServerRuntimeOptions extends JsonRpcClientOptions {
   reporter?: ProgressReporter;
   model?: string;
   clientVersion?: string;
+  logger?: RunLogger;
 }
 
 export class AppServerRuntime implements AgentRuntime {
@@ -59,6 +64,7 @@ export class AppServerRuntime implements AgentRuntime {
   readonly #reporter: ProgressReporter | undefined;
   readonly #model: string | undefined;
   readonly #clientVersion: string;
+  readonly #logger: RunLogger | undefined;
   readonly #collectors = new Map<string, TurnCollector>();
   readonly #earlyEvents = new Map<
     string,
@@ -71,14 +77,17 @@ export class AppServerRuntime implements AgentRuntime {
     this.#reporter = options.reporter;
     this.#model = options.model;
     this.#clientVersion = options.clientVersion ?? "0.1.0";
+    this.#logger = options.logger;
     this.#client = new JsonRpcProcessClient(options);
   }
 
   public async initialize(): Promise<void> {
     if (this.#initialized) {
+      this.#logger?.log("debug", "runtime.initialize.skipped");
       return;
     }
 
+    this.#logger?.log("debug", "runtime.initialize.start");
     await this.#client.start();
     this.#unsubscribe = this.#client.onNotification((method, params) =>
       this.#onNotification(method, params),
@@ -92,6 +101,7 @@ export class AppServerRuntime implements AgentRuntime {
       },
     });
     this.#client.notify("initialized", {});
+    this.#logger?.log("debug", "runtime.initialize.complete");
     this.#initialized = true;
   }
 
@@ -110,6 +120,11 @@ export class AppServerRuntime implements AgentRuntime {
         serviceName: "pre2prod",
       },
     );
+    this.#logger?.log("debug", "runtime.thread.start", {
+      threadId: response.thread.id,
+      cwd: options.cwd,
+      requestedModel: options.model ?? this.#model,
+    });
     return {
       id: response.thread.id,
       ...(response.thread.sessionId
@@ -128,6 +143,11 @@ export class AppServerRuntime implements AgentRuntime {
       lastTurnId,
       ephemeral: true,
     });
+    this.#logger?.log("debug", "runtime.thread.fork", {
+      parentThreadId: threadId,
+      sourceTurnId: lastTurnId,
+      forkedThreadId: response.thread.id,
+    });
     return {
       id: response.thread.id,
       ...(response.thread.sessionId
@@ -138,6 +158,7 @@ export class AppServerRuntime implements AgentRuntime {
 
   public async runTurn(request: TurnRequest): Promise<TurnResult> {
     this.#assertInitialized();
+    const logContext = request.logContext;
 
     const response = await this.#client.request<TurnStartResponse>(
       "turn/start",
@@ -158,6 +179,18 @@ export class AppServerRuntime implements AgentRuntime {
         ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
       },
     );
+    this.#logger?.log(
+      "info",
+      "runtime.turn.started",
+      {
+        turnId: response.turn.id,
+        threadId: request.threadId,
+        sandbox: request.sandbox,
+        hasOutputSchema: request.outputSchema !== undefined,
+        networkAccess: request.networkAccess ?? true,
+        ...logContext,
+      },
+    );
 
     const turnId = response.turn.id;
     const result = new Promise<TurnResult>((resolve, reject) => {
@@ -166,6 +199,8 @@ export class AppServerRuntime implements AgentRuntime {
         text: "",
         diff: undefined,
         usage: undefined,
+        threadId: request.threadId,
+        logContext,
         resolve,
         reject,
       });
@@ -187,6 +222,11 @@ export class AppServerRuntime implements AgentRuntime {
     goal: ThreadGoalRequest,
   ): Promise<ThreadGoal> {
     this.#assertInitialized();
+    this.#logger?.log("debug", "runtime.goal.set", {
+      threadId,
+      objective: goal.objective,
+      status: goal.status,
+    });
     const response = await this.#client.request<ThreadGoalResponse>(
       "thread/goal/set",
       {
@@ -203,6 +243,7 @@ export class AppServerRuntime implements AgentRuntime {
 
   public async getThreadGoal(threadId: string): Promise<ThreadGoal | null> {
     this.#assertInitialized();
+    this.#logger?.log("debug", "runtime.goal.get", { threadId });
     const response = await this.#client.request<ThreadGoalGetResponse>(
       "thread/goal/get",
       { threadId },
@@ -212,6 +253,7 @@ export class AppServerRuntime implements AgentRuntime {
 
   public async clearThreadGoal(threadId: string): Promise<boolean> {
     this.#assertInitialized();
+    this.#logger?.log("debug", "runtime.goal.clear", { threadId });
     const response = await this.#client.request<ThreadGoalClearResponse>(
       "thread/goal/clear",
       { threadId },
@@ -220,8 +262,10 @@ export class AppServerRuntime implements AgentRuntime {
   }
 
   public async close(): Promise<void> {
+    this.#logger?.log("debug", "runtime.close.start");
     this.#unsubscribe?.();
     await this.#client.close();
+    this.#logger?.log("debug", "runtime.close.complete");
   }
 
   #onNotification(method: string, params: unknown): void {
@@ -246,7 +290,9 @@ export class AppServerRuntime implements AgentRuntime {
         return;
       }
       if (method === "warning" || method === "configWarning") {
-        this.#reporter?.warning(getMessage(params) ?? method);
+        const message = getMessage(params) ?? method;
+        this.#reporter?.warning(message);
+        this.#logger?.log("warn", "runtime.warning", { message });
       }
       return;
     }
@@ -260,6 +306,11 @@ export class AppServerRuntime implements AgentRuntime {
       const delta = getString(params, "delta");
       if (delta) {
         this.#reporter?.verbose(delta);
+        this.#logger?.log("debug", "runtime.turn.delta", {
+          ...this.#collectorContext(collector),
+          turnId,
+          deltaSnippet: delta.slice(0, 140),
+        });
       }
       return;
     }
@@ -277,7 +328,17 @@ export class AppServerRuntime implements AgentRuntime {
           typeof item.command === "string" ? item.command : "command";
         const status =
           typeof item.status === "string" ? item.status : undefined;
-        this.#reporter?.command(command, status);
+        this.#reporter?.command(
+          command,
+          status,
+          this.#collectorContext(collector),
+        );
+        this.#logger?.log("info", "runtime.command", {
+          ...this.#collectorContext(collector),
+          turnId,
+          command,
+          status,
+        });
       }
       return;
     }
@@ -286,6 +347,11 @@ export class AppServerRuntime implements AgentRuntime {
       const diff = getString(params, "diff");
       if (diff !== undefined) {
         collector.diff = diff;
+        this.#logger?.log("debug", "runtime.turn.diff", {
+          ...this.#collectorContext(collector),
+          turnId,
+          diffLength: diff.length,
+        });
       }
       return;
     }
@@ -293,6 +359,11 @@ export class AppServerRuntime implements AgentRuntime {
     if (method === "thread/tokenUsage/updated") {
       if (isRecord(params)) {
         collector.usage = params;
+        this.#logger?.log("debug", "runtime.turn.usage", {
+          ...this.#collectorContext(collector),
+          turnId,
+          usage: params,
+        });
       }
       return;
     }
@@ -318,15 +389,37 @@ export class AppServerRuntime implements AgentRuntime {
       this.#collectors.delete(turnId);
 
       if (normalizedStatus !== "completed") {
+        this.#logger?.log("error", "runtime.turn.failed", {
+          ...this.#collectorContext(collector),
+          turnId,
+          status: normalizedStatus,
+          error,
+        });
         collector.reject(
           new TurnFailedError(
             error ?? `Turn ${turnId} ended with status ${normalizedStatus}`,
           ),
         );
       } else {
+        this.#logger?.log("info", "runtime.turn.completed", {
+          ...this.#collectorContext(collector),
+          turnId,
+          status: normalizedStatus,
+          diffLength:
+            collector.diff === undefined ? 0 : collector.diff.length,
+          usage: collector.usage,
+          textLength: collector.text.length,
+        });
         collector.resolve(result);
       }
     }
+  }
+
+  #collectorContext(collector: TurnCollector): Record<string, unknown> {
+    return {
+      threadId: collector.threadId,
+      ...collector.logContext,
+    };
   }
 
   #assertInitialized(): void {

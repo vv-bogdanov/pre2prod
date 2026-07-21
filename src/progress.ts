@@ -54,7 +54,12 @@ export class ConsoleProgressReporter implements ProgressReporter {
     console.log();
   }
 
-  public command(command: string, status?: string): void {
+  public command(
+    command: string,
+    status?: string,
+    context?: Record<string, unknown>,
+  ): void {
+    void context;
     if (this.#verboseEnabled) {
       console.log(pc.dim(`      command [${status ?? "unknown"}] ${command}`));
     }
