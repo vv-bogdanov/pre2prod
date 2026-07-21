@@ -46,6 +46,30 @@ npx --yes pre2prod \
   "Prefer Railway, preserve the monolith, and avoid paid services"
 ```
 
+## Review Phases Configuration
+
+Phase prompts are loaded in this order:
+
+1. `<repo>/.pre2prod/phases.yaml`
+2. `$HOME/.pre2prod/phases.yaml`
+3. built-in `resources/phases.yaml`
+
+`phases.yaml` supports a compact format where each phase is a YAML key and a multiline prompt:
+
+```yaml
+"Architecture and maintainability": |
+  Review material architectural and maintainability risks.
+  Look for coupling, hidden side effects, and oversized modules.
+
+Security: |
+  Review the security posture relevant to this project.
+  Focus on exploitable or materially risky gaps.
+```
+
+`id` is derived from the key as slug (`Architecture and maintainability` → `architecture-and-maintainability`).
+
+You can still use the full YAML format with `include`, `phases`, and object-style phase definitions when needed.
+
 ## CLI
 
 ```text
