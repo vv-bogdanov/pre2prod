@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import type {
   AgentRuntime,
   Phase,
+  TurnResult,
   PhaseSummary,
   PipelineOptions,
   PipelineResult,
@@ -61,8 +62,11 @@ export class Pre2prodPipeline {
 
       for (const [index, phase] of phases.entries()) {
         this.#reporter.phaseStarted(index + 1, phases.length, phase);
-        const summary = await this.#runPhase(reviewer.id, phase, options, (phaseId, iteration) =>
-          git.commitWorker(phaseId, iteration),
+        const summary = await this.#runPhase(
+          reviewer.id,
+          phase,
+          options,
+          (phaseId, iteration) => git.commitWorker(phaseId, iteration),
         );
         summaries.push(summary);
       }
@@ -88,16 +92,30 @@ export class Pre2prodPipeline {
     let isRepeat = false;
     let latestFindings: string[] = [];
 
-    for (let iteration = 0; iteration <= options.maxIterationsPerPhase; iteration += 1) {
+    for (
+      let iteration = 0;
+      iteration <= options.maxIterationsPerPhase;
+      iteration += 1
+    ) {
       this.#reporter.reviewing(isRepeat);
-      const reviewTurn = await this.#runtime.runTurn({
-        threadId: reviewerThreadId,
-        prompt: phaseReviewPrompt(phase, options.instructions, isRepeat),
-        cwd: options.cwd,
-        sandbox: "readOnly",
-        outputSchema: REVIEW_OUTPUT_SCHEMA,
+      await this.#runtime.setThreadGoal(reviewerThreadId, {
+        objective: this.#reviewGoalObjective(phase, iteration),
+        status: "active",
       });
-      const review = parseReviewResult(reviewTurn.text);
+      let reviewTurn: TurnResult | undefined;
+      let review: ReturnType<typeof parseReviewResult>;
+      try {
+        reviewTurn = await this.#runtime.runTurn({
+          threadId: reviewerThreadId,
+          prompt: phaseReviewPrompt(phase, options.instructions, isRepeat),
+          cwd: options.cwd,
+          sandbox: "readOnly",
+          outputSchema: REVIEW_OUTPUT_SCHEMA,
+        });
+        review = parseReviewResult(reviewTurn.text);
+      } finally {
+        await this.#runtime.clearThreadGoal(reviewerThreadId);
+      }
       latestFindings = review.findings;
 
       if (review.status === "PASS") {
@@ -113,32 +131,61 @@ export class Pre2prodPipeline {
         );
       }
 
-      const worker = await this.#runtime.forkThread(reviewerThreadId, reviewTurn.turnId);
+      const worker = await this.#runtime.forkThread(
+        reviewerThreadId,
+        reviewTurn.turnId,
+      );
       await rm(resolve(options.cwd, PLAN_FILE), { force: true });
       this.#reporter.planning(PLAN_FILE);
-      await this.#runtime.runTurn({
-        threadId: worker.id,
-        prompt: workerPlanningPrompt(phase, options.instructions),
-        cwd: options.cwd,
-        sandbox: "workspaceWrite",
-        networkAccess: false,
+      await this.#runtime.setThreadGoal(worker.id, {
+        objective: this.#workerPlanningGoalObjective(phase, iteration),
+        status: "active",
       });
-      await assertPlanExists(options.cwd);
+      try {
+        await this.#runtime.runTurn({
+          threadId: worker.id,
+          prompt: workerPlanningPrompt(phase, options.instructions),
+          cwd: options.cwd,
+          sandbox: "workspaceWrite",
+          networkAccess: false,
+        });
+        await assertPlanExists(options.cwd);
 
-      this.#reporter.working();
-      await this.#runtime.runTurn({
-        threadId: worker.id,
-        prompt: workerExecutionPrompt(phase, options.instructions),
-        cwd: options.cwd,
-        sandbox: "workspaceWrite",
-        networkAccess: options.networkAccess,
-      });
+        this.#reporter.working();
+        await this.#runtime.setThreadGoal(worker.id, {
+          objective: this.#workerExecutionGoalObjective(phase, iteration),
+          status: "active",
+        });
+        await this.#runtime.runTurn({
+          threadId: worker.id,
+          prompt: workerExecutionPrompt(phase, options.instructions),
+          cwd: options.cwd,
+          sandbox: "workspaceWrite",
+          networkAccess: options.networkAccess,
+        });
+      } finally {
+        await this.#runtime.clearThreadGoal(worker.id);
+      }
 
       await commitWorker(phase.id, iteration + 1);
       isRepeat = true;
     }
 
-    throw new Pre2prodError(`Unreachable phase state for ${phase.id}: ${latestFindings.join("; ")}`);
+    throw new Pre2prodError(
+      `Unreachable phase state for ${phase.id}: ${latestFindings.join("; ")}`,
+    );
+  }
+
+  #reviewGoalObjective(phase: Phase, iteration: number): string {
+    return `${phase.title} review (${formatIteration(iteration)})`;
+  }
+
+  #workerPlanningGoalObjective(phase: Phase, iteration: number): string {
+    return `${phase.title} worker planning (${formatIteration(iteration)})`;
+  }
+
+  #workerExecutionGoalObjective(phase: Phase, iteration: number): string {
+    return `${phase.title} worker execution (${formatIteration(iteration)})`;
   }
 }
 
@@ -154,6 +201,12 @@ async function assertPlanExists(cwd: string): Promise<void> {
     if (error instanceof Pre2prodError) {
       throw error;
     }
-    throw new Pre2prodError(`Planning turn did not create ${PLAN_FILE}`, { cause: error });
+    throw new Pre2prodError(`Planning turn did not create ${PLAN_FILE}`, {
+      cause: error,
+    });
   }
+}
+
+function formatIteration(iteration: number): string {
+  return `iteration ${iteration + 1}`;
 }
