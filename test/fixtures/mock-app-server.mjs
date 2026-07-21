@@ -126,46 +126,7 @@ input.on("line", async (line) => {
           turnId,
           itemId: `reasoning-${turnId}`,
           summaryIndex: 0,
-          delta: "Inspecting ",
-        },
-      });
-      send({
-        method: "item/reasoning/summaryTextDelta",
-        params: {
-          threadId: message.params.threadId,
-          turnId,
-          itemId: `reasoning-${turnId}`,
-          summaryIndex: 0,
-          delta: "the repository.",
-        },
-      });
-      send({
-        method: "item/completed",
-        params: {
-          threadId: message.params.threadId,
-          turnId,
-          item: {
-            type: "reasoning",
-            id: `reasoning-${turnId}`,
-          },
-        },
-      });
-      send({
-        method: "item/agentMessage/delta",
-        params: {
-          threadId: message.params.threadId,
-          turnId,
-          itemId: `item-${turnId}`,
-          delta: "The review ",
-        },
-      });
-      send({
-        method: "item/agentMessage/delta",
-        params: {
-          threadId: message.params.threadId,
-          turnId,
-          itemId: `item-${turnId}`,
-          delta: "is complete.",
+          delta: "Inspecting the repository.",
         },
       });
       send({
@@ -193,9 +154,7 @@ input.on("line", async (line) => {
       });
     }
 
-    let text = prompt.includes("emit observability")
-      ? "The review is complete."
-      : "Repository studied.";
+    let text = "Repository studied.";
     if (
       prompt.includes("write a complete, minimal, executable remediation plan")
     ) {

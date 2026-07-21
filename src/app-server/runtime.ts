@@ -48,19 +48,9 @@ interface TurnCollector {
   usage: Record<string, unknown> | undefined;
   threadId: string;
   logContext: TurnLogContext | undefined;
-  thinkingBuffers: Map<string, ThinkingBuffer>;
-  streamedThinkingItemIds: Set<string>;
   resolve(result: TurnResult): void;
   reject(reason: unknown): void;
 }
-
-interface ThinkingBuffer {
-  text: string;
-  timer: ReturnType<typeof setTimeout> | undefined;
-}
-
-const THINKING_CHUNK_LENGTH = 240;
-const THINKING_IDLE_DELAY_MS = 350;
 
 export interface AppServerRuntimeOptions extends JsonRpcClientOptions {
   reporter?: ProgressReporter;
@@ -212,8 +202,6 @@ export class AppServerRuntime implements AgentRuntime {
         usage: undefined,
         threadId: request.threadId,
         logContext,
-        thinkingBuffers: new Map(),
-        streamedThinkingItemIds: new Set(),
         resolve,
         reject,
       });
@@ -318,11 +306,7 @@ export class AppServerRuntime implements AgentRuntime {
     if (method === "item/reasoning/summaryTextDelta") {
       const delta = getString(params, "delta");
       if (delta) {
-        this.#bufferThinking(
-          collector,
-          getString(params, "itemId") ?? "reasoning",
-          delta,
-        );
+        this.#reporter?.thinking(delta, this.#collectorContext(collector));
         this.#logger?.log("debug", "runtime.turn.reasoning_summary", {
           ...this.#collectorContext(collector),
           turnId,
@@ -335,11 +319,7 @@ export class AppServerRuntime implements AgentRuntime {
     if (method === "item/agentMessage/delta") {
       const delta = getString(params, "delta");
       if (delta) {
-        this.#bufferThinking(
-          collector,
-          getString(params, "itemId") ?? "message",
-          delta,
-        );
+        this.#reporter?.thinking(delta, this.#collectorContext(collector));
         this.#reporter?.verbose(delta);
         this.#logger?.log("debug", "runtime.turn.delta", {
           ...this.#collectorContext(collector),
@@ -374,18 +354,9 @@ export class AppServerRuntime implements AgentRuntime {
       if (!item) {
         return;
       }
-      const itemId = getString(item, "id");
-      if (itemId) {
-        this.#flushThinking(collector, itemId);
-      }
       if (item.type === "agentMessage" && typeof item.text === "string") {
         collector.text = item.text;
-        if (!itemId || !collector.streamedThinkingItemIds.has(itemId)) {
-          this.#reporter?.thinking(
-            item.text,
-            this.#collectorContext(collector),
-          );
-        }
+        this.#reporter?.thinking(item.text, this.#collectorContext(collector));
       }
       if (item.type === "commandExecution") {
         const command =
@@ -474,7 +445,6 @@ export class AppServerRuntime implements AgentRuntime {
           ? status
           : "failed";
       const error = getErrorMessage(turn?.error);
-      this.#flushAllThinking(collector);
       const result: TurnResult = {
         turnId,
         status: normalizedStatus,
@@ -519,76 +489,6 @@ export class AppServerRuntime implements AgentRuntime {
       threadId: collector.threadId,
       ...collector.logContext,
     };
-  }
-
-  #bufferThinking(
-    collector: TurnCollector,
-    itemId: string,
-    delta: string,
-  ): void {
-    const buffer = collector.thinkingBuffers.get(itemId) ?? {
-      text: "",
-      timer: undefined,
-    };
-    buffer.text += delta;
-    collector.streamedThinkingItemIds.add(itemId);
-    collector.thinkingBuffers.set(itemId, buffer);
-
-    this.#flushCompleteThinkingChunks(collector, itemId, buffer);
-    if (!buffer.text) {
-      return;
-    }
-
-    if (buffer.timer) {
-      clearTimeout(buffer.timer);
-    }
-    buffer.timer = setTimeout(() => {
-      if (this.#collectors.get(collector.turnId) === collector) {
-        this.#flushThinking(collector, itemId);
-      }
-    }, THINKING_IDLE_DELAY_MS);
-    buffer.timer.unref();
-  }
-
-  #flushCompleteThinkingChunks(
-    collector: TurnCollector,
-    itemId: string,
-    buffer: ThinkingBuffer,
-  ): void {
-    let boundary = findThinkingBoundary(buffer.text);
-    while (boundary !== undefined) {
-      this.#reporter?.thinking(
-        buffer.text.slice(0, boundary),
-        this.#collectorContext(collector),
-      );
-      buffer.text = buffer.text.slice(boundary);
-      boundary = findThinkingBoundary(buffer.text);
-    }
-    if (!buffer.text && buffer.timer) {
-      clearTimeout(buffer.timer);
-      buffer.timer = undefined;
-    }
-    collector.thinkingBuffers.set(itemId, buffer);
-  }
-
-  #flushThinking(collector: TurnCollector, itemId: string): void {
-    const buffer = collector.thinkingBuffers.get(itemId);
-    if (!buffer) {
-      return;
-    }
-    if (buffer.timer) {
-      clearTimeout(buffer.timer);
-    }
-    if (buffer.text) {
-      this.#reporter?.thinking(buffer.text, this.#collectorContext(collector));
-    }
-    collector.thinkingBuffers.delete(itemId);
-  }
-
-  #flushAllThinking(collector: TurnCollector): void {
-    for (const itemId of collector.thinkingBuffers.keys()) {
-      this.#flushThinking(collector, itemId);
-    }
   }
 
   #assertInitialized(): void {
@@ -717,18 +617,6 @@ function getErrorMessage(value: unknown): string | undefined {
   return isRecord(value) && typeof value.message === "string"
     ? value.message
     : undefined;
-}
-
-function findThinkingBoundary(text: string): number | undefined {
-  const newline = text.lastIndexOf("\n", THINKING_CHUNK_LENGTH);
-  if (newline >= 0) {
-    return newline + 1;
-  }
-  if (text.length < THINKING_CHUNK_LENGTH) {
-    return undefined;
-  }
-  const whitespace = text.lastIndexOf(" ", THINKING_CHUNK_LENGTH);
-  return whitespace > 0 ? whitespace + 1 : THINKING_CHUNK_LENGTH;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
