@@ -84,6 +84,7 @@ Options:
   -p, --phases <ids>          run only these phases (id or group prefix, comma-separated, can be repeated)
   -x, --exclude <ids>         exclude phases (id or group prefix, comma-separated, can be repeated)
   -l, --list                  list phases (after include/exclude filters) and exit
+  -o, --observe               stream reviewer/worker thinking, tools, and file changes
   --verbose                   show streamed model and command details
 ```
 

@@ -48,10 +48,14 @@ program
     [],
   )
   .option("-l, --list", "List available phases and exit", false)
+  .option("-o, --observe", "Stream thinking, command, and file-change telemetry", false)
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliRunOptions) => {
     const cwd = resolve(options.cwd);
-    const reporter = new ConsoleProgressReporter(options.verbose);
+    const reporter = new ConsoleProgressReporter(
+      options.verbose,
+      options.observe || options.verbose,
+    );
     const runId = createRunId();
     const logger = new FileRunLogger({
       cwd,
@@ -158,6 +162,7 @@ interface CliRunOptions {
   network: boolean;
   logDir: string;
   codexBin: string;
+  observe: boolean;
   phases: string[];
   exclude: string[];
   list: boolean;

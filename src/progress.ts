@@ -4,9 +4,11 @@ import type { Phase, PipelineResult, ProgressReporter } from "./core/types.js";
 
 export class ConsoleProgressReporter implements ProgressReporter {
   readonly #verboseEnabled: boolean;
+  readonly #observeEnabled: boolean;
 
-  public constructor(verbose = false) {
+  public constructor(verbose = false, observe = false) {
     this.#verboseEnabled = verbose;
+    this.#observeEnabled = observe;
   }
 
   public title(): void {
@@ -59,10 +61,38 @@ export class ConsoleProgressReporter implements ProgressReporter {
     status?: string,
     context?: Record<string, unknown>,
   ): void {
-    void context;
+    const contextLabel = this.#formatContext(context);
     console.log(
-      pc.dim(`      command [${status ?? "unknown"}] ${this.#verboseEnabled ? command : command.slice(0, 220)}`),
+      pc.dim(
+        `      ${contextLabel} command [${status ?? "unknown"}] ${this.#verboseEnabled ? command : command.slice(0, 220)}`,
+      ),
     );
+  }
+
+  public thinking(message: string, context?: Record<string, unknown>): void {
+    if (!this.#observeEnabled) {
+      return;
+    }
+    const contextLabel = this.#formatContext(context);
+    for (const line of splitLines(message)) {
+      if (!line.trim()) {
+        continue;
+      }
+      console.log(pc.dim(`      ${contextLabel} think: ${line}`));
+    }
+  }
+
+  public filesTouched(
+    paths: readonly string[],
+    context?: Record<string, unknown>,
+  ): void {
+    if (!this.#observeEnabled || paths.length === 0) {
+      return;
+    }
+    const contextLabel = this.#formatContext(context);
+    for (const path of paths) {
+      console.log(pc.green(`      ${contextLabel} file: ${path}`));
+    }
   }
 
   public waiting(message: string): void {
@@ -89,4 +119,22 @@ export class ConsoleProgressReporter implements ProgressReporter {
   public failed(message: string): void {
     console.error(pc.red(pc.bold(`Pre2prod failed: ${message}`)));
   }
+
+  #formatContext(context?: Record<string, unknown>): string {
+    if (!context) {
+      return "";
+    }
+    const role = typeof context.threadRole === "string" ? context.threadRole : "agent";
+    const turn = typeof context.phaseTurn === "string" ? context.phaseTurn : "turn";
+    const phase =
+      typeof context.phaseId === "string" &&
+      typeof context.phaseIteration === "number"
+        ? `${context.phaseId}#${context.phaseIteration}`
+        : "phase";
+    return `[${role}/${turn} ${phase}]`;
+  }
+}
+
+function splitLines(text: string): string[] {
+  return text.trim().split(/\r?\n/);
 }

@@ -305,6 +305,7 @@ export class AppServerRuntime implements AgentRuntime {
     if (method === "item/agentMessage/delta") {
       const delta = getString(params, "delta");
       if (delta) {
+        this.#reporter?.thinking(delta, this.#collectorContext(collector));
         this.#reporter?.verbose(delta);
         this.#logger?.log("debug", "runtime.turn.delta", {
           ...this.#collectorContext(collector),
@@ -322,6 +323,7 @@ export class AppServerRuntime implements AgentRuntime {
       }
       if (item.type === "agentMessage" && typeof item.text === "string") {
         collector.text = item.text;
+        this.#reporter?.thinking(item.text, this.#collectorContext(collector));
       }
       if (item.type === "commandExecution") {
         const command =
@@ -339,6 +341,22 @@ export class AppServerRuntime implements AgentRuntime {
           command,
           status,
         });
+      } else if (item.type === "fileChange") {
+        const touched = extractTouchedPaths(item);
+        if (touched.length > 0) {
+          this.#reporter?.filesTouched(
+            touched,
+            this.#collectorContext(collector),
+          );
+        }
+        const summary = itemSummary(item);
+        if (summary !== undefined) {
+          this.#logger?.log("debug", "runtime.file_change", {
+            ...this.#collectorContext(collector),
+            turnId,
+            summary,
+          });
+        }
       }
       return;
     }
@@ -469,6 +487,76 @@ function getObject(
   key: string,
 ): Record<string, unknown> | undefined {
   return isRecord(value) && isRecord(value[key]) ? value[key] : undefined;
+}
+
+function extractTouchedPaths(value: Record<string, unknown>): string[] {
+  const results = new Set<string>();
+
+  const single = getString(value, "path");
+  if (single) {
+    results.add(single);
+  }
+
+  const file = getString(value, "file");
+  if (file) {
+    results.add(file);
+  }
+
+  const files = getStringArray(value, "files");
+  for (const value of files) {
+    results.add(value);
+  }
+
+  const changes = getObject(value, "changes");
+  if (changes) {
+    const changePath = getString(changes, "path");
+    if (changePath) {
+      results.add(changePath);
+    }
+  }
+
+  const items = getArray(value, "items");
+  for (const item of items) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const path = getString(item, "path");
+    const filePath = getString(item, "file");
+    if (path) {
+      results.add(path);
+    }
+    if (filePath) {
+      results.add(filePath);
+    }
+  }
+
+  return Array.from(results);
+}
+
+function getArray(
+  value: Record<string, unknown>,
+  key: string,
+): unknown[] {
+  const items = value[key];
+  return Array.isArray(items) ? (items as unknown[]) : [];
+}
+
+function getStringArray(value: unknown, key: string): string[] {
+  const raw = isRecord(value) ? value[key] : undefined;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const values: string[] = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim()) {
+      values.push(item);
+    }
+  }
+  return values;
+}
+
+function itemSummary(value: Record<string, unknown>): string | undefined {
+  return getString(value, "summary") ?? getString(value, "status");
 }
 
 function getErrorMessage(value: unknown): string | undefined {
