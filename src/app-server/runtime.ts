@@ -175,6 +175,8 @@ export class AppServerRuntime implements AgentRuntime {
   public async runTurn(request: TurnRequest): Promise<TurnResult> {
     this.#assertInitialized();
     const logContext = request.logContext;
+    const networkAccess =
+      request.sandbox === "read-only" ? false : (request.networkAccess ?? true);
 
     const response = parseTurnStartResponse(
       await this.#client.request<unknown>("turn/start", {
@@ -184,11 +186,11 @@ export class AppServerRuntime implements AgentRuntime {
         approvalPolicy: "never",
         sandboxPolicy:
           request.sandbox === "read-only"
-            ? { type: "readOnly", networkAccess: false }
+            ? { type: "readOnly", networkAccess }
             : {
                 type: "workspaceWrite",
                 writableRoots: [request.cwd],
-                networkAccess: request.networkAccess ?? true,
+                networkAccess,
                 excludeTmpdirEnvVar: true,
                 excludeSlashTmp: true,
               },
@@ -202,7 +204,7 @@ export class AppServerRuntime implements AgentRuntime {
       threadId: request.threadId,
       sandbox: request.sandbox,
       hasOutputSchema: request.outputSchema !== undefined,
-      networkAccess: request.networkAccess ?? true,
+      networkAccess,
       ...logContext,
     });
 

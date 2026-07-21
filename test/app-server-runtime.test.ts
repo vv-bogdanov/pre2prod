@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { AppServerRuntime } from "../src/app-server/runtime.js";
 import { ProtocolError } from "../src/core/errors.js";
 import type { Phase, ProgressReporter } from "../src/core/types.js";
+import { FileRunLogger } from "../src/logging.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
 
 const execFileAsync = promisify(execFile);
@@ -110,6 +111,53 @@ describe("Pre2prodPipeline with App Server transport", () => {
     expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe(
       "fixed\n",
     );
+  });
+
+  it("logs the effective network policy for each turn sandbox", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-network-log-"));
+    const logger = new FileRunLogger({
+      cwd,
+      runId: "network-policy-test",
+    });
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      logger,
+    });
+
+    try {
+      await runtime.initialize();
+      const thread = await runtime.startThread({ cwd });
+      await runtime.runTurn({
+        threadId: thread.id,
+        prompt: "read-only turn",
+        cwd,
+        sandbox: "read-only",
+      });
+      await runtime.runTurn({
+        threadId: thread.id,
+        prompt: "workspace turn without explicit network setting",
+        cwd,
+        sandbox: "workspace-write",
+      });
+      await runtime.runTurn({
+        threadId: thread.id,
+        prompt: "workspace turn with network disabled",
+        cwd,
+        sandbox: "workspace-write",
+        networkAccess: false,
+      });
+    } finally {
+      await runtime.close();
+    }
+
+    const events = await readJsonRecords(FileRunLogger.paths(cwd).full);
+    expect(
+      events
+        .filter((event) => event.event === "runtime.turn.started")
+        .map((event) => event.networkAccess),
+    ).toEqual([false, true, false]);
   });
 
   it("rejects malformed thread/start results", async () => {
@@ -228,6 +276,18 @@ async function initBaseRepository(cwd: string): Promise<void> {
     "-m",
     "initial",
   ]);
+}
+
+async function readJsonRecords(
+  path: string,
+): Promise<Record<string, unknown>[]> {
+  const content = (await readFile(path, "utf8")).trim();
+  if (!content) {
+    return [];
+  }
+  return content
+    .split("\n")
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
 async function execGit(cwd: string, args: string[]): Promise<string> {

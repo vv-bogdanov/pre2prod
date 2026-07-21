@@ -131,6 +131,30 @@ describe("FileRunLogger", () => {
     expect(event?.safe).toBe("keep-me");
   });
 
+  it("redacts credentials inside persisted review findings", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-logs-"));
+    const logger = new FileRunLogger({
+      cwd,
+      runId: createRunId(new Date("2026-07-21T12:00:05.000Z")),
+    });
+
+    logger.log(
+      "info",
+      "phase.review.completed",
+      {
+        blockers: ["Remove token=finding-secret"],
+        non_blockers: ["Keep this finding"],
+      },
+      { summary: true },
+    );
+
+    const [event] = await readJsonRecords(FileRunLogger.paths(cwd).summary);
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain("finding-secret");
+    expect(serialized).toContain("Remove token=[REDACTED]");
+    expect(serialized).toContain("Keep this finding");
+  });
+
   it("warns once per file and continues when writes fail", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-logs-"));
     const warnings: string[] = [];

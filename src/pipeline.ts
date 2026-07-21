@@ -251,6 +251,8 @@ export class Pre2prodPipeline {
             phaseIteration,
             blockersCount: review.blockers.length,
             nonBlockersCount: review.non_blockers.length,
+            blockers: review.blockers,
+            non_blockers: review.non_blockers,
             turnId: reviewTurn.turnId,
           },
           { summary: true },

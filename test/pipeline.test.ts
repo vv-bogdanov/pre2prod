@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -17,6 +17,7 @@ import type {
   TurnResult,
 } from "../src/core/types.js";
 import { PhaseFailedError } from "../src/core/errors.js";
+import { FileRunLogger } from "../src/logging.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
 import { REVIEW_RESULT_SCHEMA } from "../src/reviewer.js";
 
@@ -74,6 +75,50 @@ describe("Pre2prodPipeline", () => {
         request.threadId.startsWith("worker"),
       ),
     ).toHaveLength(0);
+  });
+
+  it("persists review findings when a phase reaches max iterations", async () => {
+    const cwd = await createInitializedRepo();
+    const logCwd = await mkdtemp(resolve(tmpdir(), "pre2prod-review-logs-"));
+    const logger = new FileRunLogger({
+      cwd: logCwd,
+      runId: "review-findings-test",
+    });
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({
+        blockers: ["First blocker"],
+        non_blockers: ["First non-blocker"],
+      }),
+      "Plan written",
+      "Plan executed",
+      JSON.stringify({
+        blockers: ["Final blocker"],
+        non_blockers: ["Final non-blocker"],
+      }),
+    ]);
+    const pipeline = new Pre2prodPipeline(
+      runtime,
+      silentReporter(),
+      [phase],
+      logger,
+    );
+
+    await expect(
+      pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
+    ).rejects.toBeInstanceOf(PhaseFailedError);
+
+    const content = await readFile(FileRunLogger.paths(logCwd).summary, "utf8");
+    const reviewEvents = content
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((event) => event.event === "phase.review.completed");
+    expect(reviewEvents).toHaveLength(2);
+    expect(reviewEvents.at(-1)).toMatchObject({
+      blockers: ["Final blocker"],
+      non_blockers: ["Final non-blocker"],
+    });
   });
 
   it("triggers a worker when blockers exist", async () => {
