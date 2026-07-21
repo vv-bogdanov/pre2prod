@@ -3,28 +3,34 @@ import { describe, expect, it } from "vitest";
 import { parseReviewResult } from "../src/reviewer.js";
 
 describe("parseReviewResult", () => {
-  it("parses structured output", () => {
-    expect(parseReviewResult('{"status":"NEEDS_WORK","findings":["Missing tests"]}')).toEqual({
-      status: "NEEDS_WORK",
-      findings: ["Missing tests"],
+  it("parses blockers and non_blockers", () => {
+    expect(
+      parseReviewResult(
+        '{"blockers":["Missing tests"],"non_blockers":["Minor cleanup"]}',
+      ),
+    ).toEqual({
+      blockers: ["Missing tests"],
+      non_blockers: ["Minor cleanup"],
     });
   });
 
-  it("supports a plain-text fallback", () => {
-    expect(parseReviewResult("NEEDS_WORK\n- Missing tests\n2. Missing CI")).toEqual({
-      status: "NEEDS_WORK",
-      findings: ["Missing tests", "Missing CI"],
-    });
+  it("enforces both arrays", () => {
+    expect(() =>
+      parseReviewResult('{"blockers":["Only blockers"]}'),
+    ).toThrow(/does not match required structure/i);
   });
 
-  it("clears findings for PASS", () => {
-    expect(parseReviewResult('{"status":"PASS","findings":["ignored"]}')).toEqual({
-      status: "PASS",
-      findings: [],
-    });
+  it("requires exact object shape", () => {
+    expect(() => parseReviewResult("not json")).toThrow(
+      /Reviewer response is not valid JSON/i,
+    );
   });
 
-  it("rejects unclassifiable responses", () => {
-    expect(() => parseReviewResult("Looks mostly fine")).toThrow(/cannot be classified/i);
+  it("rejects unknown fields", () => {
+    expect(() =>
+      parseReviewResult(
+        '{"blockers":[],"non_blockers":[],"status":"PASS"}',
+      ),
+    ).toThrow(/does not match required structure/i);
   });
 });

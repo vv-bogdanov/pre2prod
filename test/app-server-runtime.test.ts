@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { AppServerRuntime } from "../src/app-server/runtime.js";
-import { REVIEW_OUTPUT_SCHEMA } from "../src/reviewer.js";
+import { REVIEW_RESULT_SCHEMA } from "../src/reviewer.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const mockServer = resolve(here, "fixtures/mock-app-server.mjs");
@@ -39,9 +39,9 @@ describe("AppServerRuntime", () => {
         prompt: "review",
         cwd,
         sandbox: "readOnly",
-        outputSchema: REVIEW_OUTPUT_SCHEMA,
+        outputSchema: REVIEW_RESULT_SCHEMA,
       });
-      expect(review.text).toContain('"NEEDS_WORK"');
+      expect(review.text).toContain('"blockers"');
 
       const worker = await runtime.forkThread(reviewer.id, review.turnId);
       const planGoal = await runtime.setThreadGoal(worker.id, {

@@ -16,6 +16,7 @@ import type {
 } from "../src/core/types.js";
 import { PhaseFailedError } from "../src/core/errors.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
+import { REVIEW_RESULT_SCHEMA } from "../src/reviewer.js";
 
 const phase: Phase = {
   id: "testing",
@@ -24,17 +25,56 @@ const phase: Phase = {
 };
 
 describe("Pre2prodPipeline", () => {
-  it("runs discovery, review, worker plan/execute, and re-review", async () => {
+  it("passes when blockers are empty", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      '{"status":"NEEDS_WORK","findings":["Missing a critical test"]}',
+      JSON.stringify({ blockers: [], non_blockers: ["Optional docs improvement"] }),
+    ]);
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    const result = await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 2,
+      networkAccess: false,
+    });
+
+    expect(result.phases[0]?.iterations).toBe(0);
+    expect(result.phases[0]?.passed).toBe(true);
+    expect(runtime.forks).toHaveLength(0);
+  });
+
+  it("does not trigger worker for non_blockers only", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({ blockers: [], non_blockers: ["Optional docs improvement"] }),
+    ]);
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 2,
+      networkAccess: false,
+    });
+
+    expect(runtime.forks).toHaveLength(0);
+    expect(
+      runtime.requests.filter((request) => request.threadId.startsWith("worker")),
+    ).toHaveLength(0);
+  });
+
+  it("triggers a worker when blockers exist", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({ blockers: ["Missing a critical test"], non_blockers: [] }),
       "Plan written",
       "Plan executed",
-      '{"status":"PASS","findings":[]}',
+      JSON.stringify({ blockers: [], non_blockers: [] }),
     ]);
-
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
     const result = await pipeline.run({
       cwd,
       model: "mock",
@@ -48,116 +88,100 @@ describe("Pre2prodPipeline", () => {
     expect(runtime.forks).toEqual([
       { threadId: "reviewer", lastTurnId: "turn-2" },
     ]);
-    expect(runtime.requests.map((request) => request.threadId)).toEqual([
-      "reviewer",
-      "reviewer",
-      "worker-1",
-      "worker-1",
-      "reviewer",
-    ]);
-    expect(runtime.goals).toEqual([
-      {
-        action: "set",
-        threadId: "reviewer",
-        payload: {
-          objective: "Testing review (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "reviewer", payload: undefined },
-      {
-        action: "set",
-        threadId: "worker-1",
-        payload: {
-          objective: "Testing worker planning (iteration 1)",
-          status: "active",
-        },
-      },
-      {
-        action: "set",
-        threadId: "worker-1",
-        payload: {
-          objective: "Testing worker execution (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "worker-1", payload: undefined },
-      {
-        action: "set",
-        threadId: "reviewer",
-        payload: {
-          objective: "Testing review (iteration 2)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "reviewer", payload: undefined },
-    ]);
   });
 
-  it("skips worker when a phase passes immediately", async () => {
+  it("passes only blockers to worker prompts", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      '{"status":"PASS","findings":[]}',
+      JSON.stringify({ blockers: ["Gap A", "Gap B"], non_blockers: ["Nice-to-have"] }),
+      "Plan written",
+      "Plan executed",
+      JSON.stringify({ blockers: [], non_blockers: [] }),
     ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
-    const result = await pipeline.run({
+    await pipeline.run({
       cwd,
       maxIterationsPerPhase: 2,
       networkAccess: false,
     });
 
-    expect(result.phases[0]?.iterations).toBe(0);
-    expect(runtime.forks).toHaveLength(0);
-    expect(runtime.goals).toEqual([
-      {
-        action: "set",
-        threadId: "reviewer",
-        payload: {
-          objective: "Testing review (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "reviewer", payload: undefined },
-    ]);
+    const workerPrompts = runtime.requests.filter((request) =>
+      request.threadId.startsWith("worker-"),
+    ).map((request) => request.prompt);
+    expect(workerPrompts).toHaveLength(2);
+    expect(workerPrompts.join("\n\n")).toContain("Gap A");
+    expect(workerPrompts.join("\n\n")).toContain("Gap B");
+    expect(workerPrompts.join("\n\n")).not.toContain("Nice-to-have");
   });
 
-  it("fails when the planning turn does not create PRE2PROD_PLAN.md", async () => {
+  it("includes outputSchema for reviewer turns and not for worker turns", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
-    const runtime = new FakeRuntime(
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+      "Plan written",
+      "Plan executed",
+      JSON.stringify({ blockers: [], non_blockers: [] }),
+    ]);
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await pipeline.run({
       cwd,
-      [
-        "Repository summary",
-        '{"status":"NEEDS_WORK","findings":["Missing a critical test"]}',
-        "Plan claimed",
-      ],
-      false,
+      maxIterationsPerPhase: 2,
+      networkAccess: false,
+    });
+
+    const reviewerReviewTurns = runtime.requests.filter((request) =>
+      request.threadId === "reviewer" &&
+      request.prompt.includes("Current phase"),
     );
+    expect(reviewerReviewTurns).toHaveLength(2);
+    for (const request of reviewerReviewTurns) {
+      expect(request.outputSchema).toEqual(REVIEW_RESULT_SCHEMA);
+    }
+
+    const workerTurns = runtime.requests.filter((request) =>
+      request.threadId.startsWith("worker-"),
+    );
+    for (const request of workerTurns) {
+      expect(request.outputSchema).toBeUndefined();
+    }
+  });
+
+  it("reports malformed reviewer output explicitly", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      "not valid json",
+    ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
     await expect(
       pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
-    ).rejects.toThrow(/did not create PRE2PROD_PLAN.md/i);
-    expect(runtime.goals).toEqual([
-      {
-        action: "set",
-        threadId: "reviewer",
-        payload: {
-          objective: "Testing review (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "reviewer", payload: undefined },
-      {
-        action: "set",
-        threadId: "worker-1",
-        payload: {
-          objective: "Testing worker planning (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "worker-1", payload: undefined },
+    ).rejects.toThrow(/Reviewer response is not valid JSON/i);
+  });
+
+  it("keeps persistent reviewer and exact-turn fork behavior", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+      "Plan written",
+      "Plan executed",
+      JSON.stringify({ blockers: [], non_blockers: [] }),
+    ]);
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 2,
+      networkAccess: false,
+    });
+
+    expect(runtime.forks).toEqual([
+      { threadId: "reviewer", lastTurnId: "turn-2" },
     ]);
   });
 
@@ -165,53 +189,16 @@ describe("Pre2prodPipeline", () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      '{"status":"NEEDS_WORK","findings":["Gap 1"]}',
+      JSON.stringify({ blockers: ["Gap 1"], non_blockers: [] }),
       "Plan written",
       "Plan executed",
-      '{"status":"NEEDS_WORK","findings":["Gap 2"]}',
+      JSON.stringify({ blockers: ["Gap 2"], non_blockers: [] }),
     ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
     await expect(
       pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
     ).rejects.toBeInstanceOf(PhaseFailedError);
-    expect(runtime.goals).toEqual([
-      {
-        action: "set",
-        threadId: "reviewer",
-        payload: {
-          objective: "Testing review (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "reviewer", payload: undefined },
-      {
-        action: "set",
-        threadId: "worker-1",
-        payload: {
-          objective: "Testing worker planning (iteration 1)",
-          status: "active",
-        },
-      },
-      {
-        action: "set",
-        threadId: "worker-1",
-        payload: {
-          objective: "Testing worker execution (iteration 1)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "worker-1", payload: undefined },
-      {
-        action: "set",
-        threadId: "reviewer",
-        payload: {
-          objective: "Testing review (iteration 2)",
-          status: "active",
-        },
-      },
-      { action: "clear", threadId: "reviewer", payload: undefined },
-    ]);
   });
 });
 
