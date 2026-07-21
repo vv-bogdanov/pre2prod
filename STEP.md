@@ -101,7 +101,7 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 ### Operations
 
-- [ ] `operations-observability` — Observability
+- [x] `operations-observability` — Observability
 - [ ] `operations-reliability-operability` — Reliability & Operability
 - [ ] `operations-performance-resource-efficiency` — Performance & Resource Efficiency
 
