@@ -102,7 +102,7 @@ Tests include:
 - Reviewer structured-output and fallback parsing;
 - full pipeline state transitions with a fake runtime;
 - App Server JSON-RPC integration against a mock subprocess;
-- optional Git branch/checkpoint behavior.
+- Git precondition and checkpoint commit behavior.
 
 ## Codex Skill
 
@@ -125,7 +125,7 @@ The skill only launches the CLI; it does not duplicate the workflow.
 - noninteractive by design;
 - no destructive production operations;
 - no automatic stash/reset/clean;
-- dirty or missing Git disables automatic checkpoints;
+- dirty or missing Git exits with a clear error and instruction to run `git init`;
 - deployment readiness is prepared, not automatically promoted to production;
 - the resulting repository still requires human review before production use.
 

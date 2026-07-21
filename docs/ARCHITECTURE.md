@@ -26,7 +26,7 @@ The Worker transcript never enters the Reviewer thread. The Reviewer sees only t
 - `Pre2prodPipeline`: explicit sequential orchestration.
 - `phases.ts`: ordered reviewer prompts.
 - `prompts.ts`: shared and role-specific instructions.
-- `git.ts`: optional branch/checkpoint support; workflow does not depend on Git.
+- `git.ts`: required branch/checkpoint support; workflow requires running in a git repository.
 - `PRE2PROD_PLAN.md`: single plan file overwritten by each Worker iteration.
 
 ## Protocol compatibility

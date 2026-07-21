@@ -397,26 +397,17 @@ TUI, React Ink и spinner framework не нужны.
 
 ## 17. Git
 
-Git полезен, но не обязателен.
+CLI запускается только внутри git-репозитория.
 
-### Clean Git repository
+Перед стартом выполняется проверка:
 
-Best effort:
+- `cwd` должен быть git-репозиторием (иначе завершение с инструкцией `git init`);
+- рабочее дерево должно быть clean (иначе явная ошибка).
 
-- создать отдельную ветку;
-- checkpoint commit после каждого Worker execution.
+Сейчас для запуска создаётся ветка `pre2prod/<timestamp>`, а checkpoint-коммит делается
+после успешного завершения каждой фазы.
 
-### No Git
-
-Продолжить без checkpoints.
-
-### Dirty Git
-
-Не делать stash/reset/clean. Продолжить без auto-commit и вывести предупреждение.
-
-Workflow не зависит от Git.
-
-`PRE2PROD_PLAN.md` — runtime-файл и не обязан входить в commits.
+`PRE2PROD_PLAN.md` не включается в checkpoint-коммит.
 
 ## 18. Source of truth
 
@@ -479,8 +470,8 @@ MVP готов, когда:
 11. итерации конечны;
 12. free-form instruction распространяется на весь run;
 13. pipeline полностью noninteractive;
-14. работает без Git;
-15. с чистым Git работают best-effort checkpoints;
+14. запускается только в git-репозитории (иначе падение с `git init`);
+15. сохраняет checkpoint после каждой успешной фазы;
 16. terminal progress понятен;
 17. Codex Skill запускает тот же CLI;
 18. один намеренно неподготовленный demo repo существенно улучшается end-to-end;
@@ -511,7 +502,7 @@ MVP готов, когда:
 ### Packaging
 
 15. `npx` package.
-16. Best-effort Git checkpoints.
+16. Обязательный git-режим (чистый репозиторий + checkpoint после успеха фазы).
 17. Thin Codex Skill.
 18. End-to-end demo repository.
 

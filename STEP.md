@@ -1,70 +1,67 @@
-# План миграции Reviewer на структурный JSON
+# План: обязательный git и checkpointing по фазам
 
 ## Цель
-Перевести результаты `Reviewer` с текстовых статусов на строго валидируемую JSON-структуру, сохранив текущий Reviewer/Worker процесс без изменений его семантики.
+Сделать запуск CLI зависимым от git-репозитория и сохранять изменения только после прохода каждой фазы.
 
-## Этап 1. Контракт
-1. Обновить `src/core/types.ts`:
-   - удалить `ReviewStatus`;
-   - оставить `ReviewResult = { blockers: string[]; non_blockers: string[] }`.
-2. Обновить `src/reviewer.ts`:
-   - экспортировать `REVIEW_RESULT_SCHEMA`:
-   ```ts
-   type: "object",
-   properties: {
-     blockers: { type: "array", items: { type: "string" } },
-     non_blockers: { type: "array", items: { type: "string" } },
-   },
-   required: ["blockers", "non_blockers"],
-   additionalProperties: false
-   ```
-3. Проверить и выровнять экспорт в `src/index.ts` (новые публичные сущности, без лишнего).
+## Этап 1. Зафиксировать контракт
+1. `prepareGit` должен:
+   - падать с понятной ошибкой, если директория не `git`-репозиторий;
+   - требовать очистить `working tree` перед стартом (нет незакоммиченных изменений);
+   - создавать ветку `pre2prod/<timestamp>` перед любым шагом пайплайна.
+2. Сообщение об ошибке для отсутствующего репозитория должно содержать инструкцию: `git init`.
+3. Формат коммита: `pre2prod(<slug>): <title>`, `slug` из title/id (fallback на id).
 
-## Этап 2. Валидация Reviewer результата
-1. Переписать `parseReviewResult` на строгий путь:
-   - `JSON.parse`
-   - валидация по схеме
-   - нормализация строк
-2. Удалить старую логику:
-   - parsing текстовых статусов,
-   - regex status,
-   - fallback на старый контракт и совместимость.
-3. Любой malformed/неподходящий JSON — это явная ошибка пайплайна.
+## Этап 2. Обновить `src/git.ts`
+1. Удалить/перевести в fail-fast все best-effort сценарии checkpoint.
+2. Ввести строгий `GitSession`:
+   - `enabled: true`;
+   - `branch`;
+   - `commitPhase(phase)` вместо «generic checkpoint».
+3. Реализовать:
+   - проверку репозитория (`git rev-parse --is-inside-work-tree`);
+   - fail-fast на dirty tree (`git status --porcelain`);
+   - создание branch.
+4. `commitPhase`:
+   - `git add -A`;
+   - исключить `PRE2PROD_PLAN.md` из коммита;
+   - если staged нет — silently skip;
+   - иначе `git commit`.
 
-## Этап 3. Промпты и оркестратор
-1. `src/prompts.ts`:
-   - в конец review prompt добавить точный postfix:
-   `Put only material findings that justify another change cycle in blockers; put optional improvements in non_blockers.`
-   - убрать инструкции с `PASS` / `NEEDS_WORK`.
-2. `src/pipeline.ts`:
-   - pass `outputSchema: REVIEW_RESULT_SCHEMA` во все reviewer `turn/start`;
-   - не передавать `outputSchema` в worker turns;
-   - считать фазу пройденной при `review.blockers.length === 0`;
-   - запускать Worker только при непустых `blockers`;
-   - в `workerPlanningPrompt/workerExecutionPrompt` передавать только `blockers`;
-   - не терять для Reviewer persistent thread и fork именно от turn reviewer с blockers;
-   - сохранить лимит `maxIterationsPerPhase`.
+## Этап 3. Обновить пайплайн
+1. В `src/pipeline.ts`:
+   - коммитить только после успешного `review.blockers.length === 0`;
+   - сохранять `worker` цикл и `maxIterationsPerPhase` без изменений;
+   - сохранять persistent reviewer thread;
+   - форкать `Worker` от reviewer turn с blockers.
+2. В месте инициализации пайплайна вызывать `prepareGit` и прокидывать ветку в результат.
+3. При ошибках воркера/итераций не создавать checkpoint commit.
 
-## Этап 4. Тесты и фикстуры
-1. `test/reviewer.test.ts`:
-   - валидный разбор `blockers`/`non_blockers`;
-   - ошибки для malformed/неполной/лишней структуры.
-2. `test/pipeline.test.ts`:
-   - pass по пустым blockers;
-   - non_blockers не вызывают Worker;
-   - blockers вызывают Worker;
-   - Worker получает только blockers;
-   - reviewer turns с `outputSchema`, worker turns без;
-   - malformed reviewer output => explicit throw;
-   - persistent reviewer и exact-turn fork сохранены;
-   - возможный pass после Worker цикла;
-   - лимит итераций останавливает фазу.
-3. Обновить `test/app-server-runtime.test.ts` и `test/fixtures/mock-app-server.mjs` на новый формат.
+## Этап 4. Тесты
+1. `test/git.test.ts`
+   - нет репозитория → ошибка + `git init` в тексте;
+   - dirty tree → ошибка.
+2. `test/pipeline.test.ts`
+   - все тесты, запускающие pipeline, создают временный git-репозиторий с base commit;
+   - успешная фаза создает ровно один commit;
+   - maxIterations reached: commit не создается;
+   - commit message совпадает с названием phase.
+3. `test/app-server-runtime.test.ts`
+   - инициализация временного репозитория;
+   - проверка полного reviewer-worker-reviewer цикла с JSON-ответами review.
 
-## Этап 5. Проверка
-1. Запустить подряд:
-   - `npm run lint`
-   - `npm run typecheck`
-   - `npm run build`
-   - `npm test`
-2. Критерий готовности: все проверки зелёные, логика оставлена строго в рамках миграции.
+## Этап 5. Документы
+1. Обновить README/спеки:
+   - git теперь обязательный;
+   - без репозитория запуск завершится ошибкой и текстом про `git init`;
+   - checkpoint привязан к каждой успешно пройденной фазе.
+2. В случае изменения формата outputSchema (если уже есть) синхронизировать описание и пример.
+
+## Этап 6. Валидация и фиксация
+1. `npm run lint`
+2. `npm run typecheck`
+3. `npm run build`
+4. `npm test`
+5. По завершению — commit по этапам:
+   - после `git.ts`,
+   - после `pipeline.ts` + тесты pipeline,
+   - после документации.

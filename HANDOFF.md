@@ -14,7 +14,7 @@ The starter implementation is complete and validated against a mock Codex App Se
 - re-review in the original Reviewer thread;
 - finite per-phase iteration limit;
 - noninteractive approval policy;
-- best-effort Git branch and checkpoint commits;
+- required Git branch and checkpoint commits (run fails with `git init` instruction when repo is missing).
 - explicit-only Codex Skill;
 - unit, integration, JSONL protocol, Git, and full mock pipeline tests;
 - npm build and package validation.
