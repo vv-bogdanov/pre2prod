@@ -4,7 +4,7 @@
   "description": "Reviewer-led CLI that prepares existing repositories for staging and production-oriented use.",
   "type": "module",
   "bin": {
-    "pre2prod": "./dist/cli.js"
+    "pre2prod": "./bin/pre2prod.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,6 +16,7 @@
   },
   "files": [
     "dist",
+    "bin",
     "resources",
     ".agents/skills/pre2prod",
     "README.md",

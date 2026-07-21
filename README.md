@@ -86,6 +86,12 @@ Options:
   -l, --list                  list phases (after include/exclude filters) and exit
   -o, --observe               stream reviewer/worker thinking, tools, and file changes
   --verbose                   show streamed model and command details
+  --dev                       rebuild from TypeScript before running (development mode)
+
+Use `--dev` or `PRE2PROD_DEV=1` when you want the executable to rebuild automatically before each run:
+
+```bash
+PRE2PROD_DEV=1 pre2prod -C . -o --max-iterations 1
 ```
 
 `pre2prod logs` reads run logs in `.pre2prod/logs` (or `--log-dir` override):
