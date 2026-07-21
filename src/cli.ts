@@ -43,6 +43,7 @@ program
     2,
   )
   .option("--no-network", "Disable network access for worker execution turns")
+  .option("--no-commit", "Run in the current branch without checkpoint commits")
   .option("--log-dir <path>", "Directory for run logs", ".pre2prod/logs")
   .option(
     "--codex-bin <path>",
@@ -144,6 +145,7 @@ program
           : {}),
         maxIterationsPerPhase: options.maxIterations,
         networkAccess: options.network,
+        commit: options.commit,
       });
     } catch (error) {
       reporter.failed(
@@ -218,6 +220,7 @@ interface CliRunOptions {
   network: boolean;
   logDir: string;
   codexBin: string;
+  commit: boolean;
   observe: boolean;
   phases: string[];
   exclude: string[];

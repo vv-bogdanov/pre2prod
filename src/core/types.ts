@@ -93,6 +93,7 @@ export interface PipelineOptions {
   instructions?: string;
   maxIterationsPerPhase: number;
   networkAccess: boolean;
+  commit?: boolean;
 }
 
 export interface PhaseSummary {

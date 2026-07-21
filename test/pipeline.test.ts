@@ -253,6 +253,36 @@ describe("Pre2prodPipeline", () => {
     const lastCommitMessage = await readLastCommitMessage(cwd);
     expect(lastCommitMessage).toBe("pre2prod(testing): Testing");
   });
+
+  it("keeps the current branch and changes uncommitted with commit disabled", async () => {
+    const cwd = await createInitializedRepo();
+    const branch = (await execGit(cwd, ["branch", "--show-current"])).trim();
+    const initialCommits = await countCommits(cwd);
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+      "Plan written",
+      "Plan executed",
+      JSON.stringify({ blockers: [], non_blockers: [] }),
+    ]);
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    const result = await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 2,
+      networkAccess: false,
+      commit: false,
+    });
+
+    expect(result.gitBranch).toBe(branch);
+    expect(await countCommits(cwd)).toBe(initialCommits);
+    expect((await execGit(cwd, ["branch", "--show-current"])).trim()).toBe(
+      branch,
+    );
+    expect(await execGit(cwd, ["status", "--porcelain"])).toContain(
+      "?? mock-fixed.txt",
+    );
+  });
 });
 
 class FakeRuntime implements AgentRuntime {

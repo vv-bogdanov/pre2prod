@@ -48,6 +48,7 @@ export class Pre2prodPipeline {
     this.#reporter.title();
     const phases = this.#phases ?? (await loadPhases(options.cwd));
     const runId = this.#logger.runId;
+    const commit = options.commit ?? true;
 
     this.#logger.log(
       "info",
@@ -59,13 +60,16 @@ export class Pre2prodPipeline {
         model: options.model,
         maxIterationsPerPhase: options.maxIterationsPerPhase,
         networkAccess: options.networkAccess,
+        commit,
       },
       { summary: true },
     );
 
     try {
       await this.#runtime.initialize();
-      const git = await prepareGit(options.cwd, this.#reporter);
+      const git = await prepareGit(options.cwd, this.#reporter, {
+        createBranch: commit,
+      });
       const reviewer = await this.#runtime.startThread({
         cwd: options.cwd,
         ...(options.model ? { model: options.model } : {}),
@@ -121,7 +125,9 @@ export class Pre2prodPipeline {
           index + 1,
           phases.length,
           options,
-          (phaseToCommit) => git.commitPhase(phaseToCommit),
+          commit
+            ? (phaseToCommit) => git.commitPhase(phaseToCommit)
+            : () => Promise.resolve(),
         );
         summaries.push(summary);
       }

@@ -12,12 +12,17 @@ export interface GitSession {
   commitPhase(phase: { id: string; title: string }): Promise<void>;
 }
 
+export interface PrepareGitOptions {
+  createBranch?: boolean;
+}
+
 const GIT_COMMAND_HINT =
   "Initialize a git repository first: run `git init` in the project directory (for example: git init .).";
 
 export async function prepareGit(
   cwd: string,
   reporter: ProgressReporter,
+  options: PrepareGitOptions = {},
 ): Promise<GitSession> {
   if (!(await isGitRepository(cwd))) {
     throw new Pre2prodError(`Git repository not detected.
@@ -29,6 +34,23 @@ ${GIT_COMMAND_HINT}`);
     throw new Pre2prodError(
       "Git working tree is not clean. Commit or stash local changes before running pre2prod.",
     );
+  }
+
+  if (options.createBranch === false) {
+    const branch = await currentBranch(cwd);
+    if (!branch) {
+      throw new Pre2prodError(
+        "--no-commit requires an active Git branch for manual commits.",
+      );
+    }
+    reporter.info(`Git branch: ${branch} (manual commits)`);
+    return {
+      enabled: true,
+      branch,
+      commitPhase() {
+        return Promise.resolve();
+      },
+    };
   }
 
   const branch = `pre2prod/${formatRunId(new Date())}`;
@@ -72,6 +94,12 @@ ${GIT_COMMAND_HINT}`);
       }
     },
   };
+}
+
+async function currentBranch(cwd: string): Promise<string | undefined> {
+  const result = await git(cwd, ["branch", "--show-current"]);
+  const branch = result.stdout.trim();
+  return branch || undefined;
 }
 
 async function isGitRepository(cwd: string): Promise<boolean> {

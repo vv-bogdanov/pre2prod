@@ -61,7 +61,43 @@ describe("prepareGit", () => {
       /Git working tree is not clean/,
     );
   });
+
+  it("uses the current branch and never commits in manual mode", async () => {
+    const cwd = await createInitializedRepository();
+    const branch = (await git(cwd, ["branch", "--show-current"])).trim();
+    const head = (await git(cwd, ["rev-parse", "HEAD"])).trim();
+
+    const session = await prepareGit(cwd, silentReporter(), {
+      createBranch: false,
+    });
+    expect(session.branch).toBe(branch);
+
+    await writeFile(resolve(cwd, "app.txt"), "after\n", "utf8");
+    await session.commitPhase({ id: "testing", title: "Testing" });
+
+    expect((await git(cwd, ["rev-parse", "HEAD"])).trim()).toBe(head);
+    expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe(
+      "M app.txt",
+    );
+  });
 });
+
+async function createInitializedRepository(): Promise<string> {
+  const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-git-"));
+  await git(cwd, ["init"]);
+  await writeFile(resolve(cwd, "app.txt"), "before\n", "utf8");
+  await git(cwd, ["add", "app.txt"]);
+  await git(cwd, [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "initial",
+  ]);
+  return cwd;
+}
 
 async function git(cwd: string, args: string[]): Promise<string> {
   const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });

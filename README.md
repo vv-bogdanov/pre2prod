@@ -79,6 +79,7 @@ Options:
   --local-provider <provider> run Codex with a local provider (ollama or lmstudio)
   --max-iterations <n>        worker iterations per phase (default: 2)
   --no-network                disable network for worker execution turns
+  --no-commit                 run in the current branch without checkpoint commits
   --codex-bin <path>          Codex executable
   -p, --phases <ids>          run only these phases (id or group prefix, comma-separated, can be repeated)
   -x, --exclude <ids>         exclude phases (id or group prefix, comma-separated, can be repeated)
@@ -129,6 +130,9 @@ pre2prod -C . -p testing,security
 
 # run all Architecture phases (prefix-based group selection)
 pre2prod -C . -p architecture
+
+# run one phase, review the diff, and commit manually
+pre2prod -p foundation-immediate-risk-triage --no-commit
 
 # run all except security
 pre2prod -x security
