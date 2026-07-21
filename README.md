@@ -83,7 +83,8 @@ Options:
   --codex-bin <path>          Codex executable
   -p, --phases <ids>          run only these phases (comma-separated, can be repeated)
   -x, --exclude <ids>         exclude phases (comma-separated, can be repeated)
-  --list-phases               list phases (after include/exclude filters) and exit
+  -l, --list                  list phases (after include/exclude filters) and exit
+  -l, --list-phases           list phases (after include/exclude filters) and exit (legacy alias)
   --verbose                   show streamed model and command details
 ```
 
@@ -97,7 +98,7 @@ pre2prod -C . -p testing,security
 pre2prod -x security
 
 # show final phase list after filters
-pre2prod --list-phases -p testing,security -x security
+pre2prod --list -p testing,security -x security
 ```
 
 ## Development
@@ -135,6 +136,28 @@ $pre2prod
 ```
 
 The skill only launches the CLI; it does not duplicate the workflow.
+
+## Run `pre2prod` from any project
+
+From the checked-out pre2prod repository:
+
+```bash
+npm run build
+npm link
+```
+
+Now you can run directly from any repository:
+
+```bash
+cd /path/to/project
+pre2prod --list
+```
+
+For one-off local runs without global install:
+
+```bash
+node dist/cli.js --list -C /path/to/project
+```
 
 ## Safety boundaries
 

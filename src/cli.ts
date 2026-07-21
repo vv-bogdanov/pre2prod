@@ -44,7 +44,8 @@ program
     collectPhaseIds,
     [],
   )
-  .option("--list-phases", "List available phases and exit", false)
+  .option("-l, --list", "List available phases and exit", false)
+  .option("--list-phases", "Alias for --list", false)
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliOptions) => {
     const cwd = resolve(options.cwd);
@@ -59,7 +60,7 @@ program
         options.exclude,
       );
 
-      if (options.listPhases) {
+      if (options.list || options.listPhases) {
         for (const phase of formatPhaseList(selectedPhases)) {
           console.log(phase);
         }
@@ -99,6 +100,7 @@ interface CliOptions {
   codexBin: string;
   phases: string[];
   exclude: string[];
+  list: boolean;
   listPhases: boolean;
   verbose: boolean;
 }
