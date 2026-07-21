@@ -19,8 +19,8 @@ through a simple reviewer-led loop. One phase runs as follows:
 flowchart TD
     I["Initial review"] --> R["Phase review"]
     R --> B{"Blockers found?"}
-    B -- No --> N["Next phase"]
     B -- Yes --> P["/fork Worker<br/>plan (read-only)"]
+    B -- No --> N["Next phase"]
     P --> F["/goal Worker<br/>fix plan"]
     F --> R
 ```
