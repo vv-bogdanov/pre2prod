@@ -17,6 +17,7 @@ import {
 } from "./phase-selection.js";
 
 const VERSION = "0.1.0";
+const DEFAULT_OLLAMA_MODEL = "gemma4-12b-coder-fable5-q4km:latest";
 const program = new Command();
 
 program
@@ -26,6 +27,10 @@ program
   .argument("[instructions...]", "Additional free-form direction for the whole run")
   .option("-C, --cwd <path>", "Repository working directory", process.cwd())
   .option("--model <model>", "Codex model")
+  .option(
+    "--local-provider <provider>",
+    "Run Codex with a local provider (ollama or lmstudio)",
+  )
   .option(
     "--max-iterations <number>",
     "Maximum worker iterations per phase",
@@ -52,6 +57,7 @@ program
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliRunOptions) => {
     const cwd = resolve(options.cwd);
+    const model = options.model ?? defaultLocalModel(options.localProvider);
     const reporter = new ConsoleProgressReporter(
       options.verbose,
       options.observe || options.verbose,
@@ -79,11 +85,19 @@ program
         return;
       }
 
+      reporter.info(
+        `Provider: ${options.localProvider ?? "Codex default"} · model: ${model ?? "Codex default"}`,
+      );
       const runtime = new AppServerRuntime({
         command: options.codexBin,
-        args: ["app-server"],
+        args: [
+          ...(options.localProvider
+            ? ["--oss", "--local-provider", options.localProvider]
+            : []),
+          "app-server",
+        ],
         cwd,
-        ...(options.model ? { model: options.model } : {}),
+        ...(model ? { model } : {}),
         reporter,
         logger,
         clientVersion: VERSION,
@@ -92,7 +106,7 @@ program
 
       await pipeline.run({
         cwd,
-        ...(options.model ? { model: options.model } : {}),
+        ...(model ? { model } : {}),
         ...(additionalInstructions ? { instructions: additionalInstructions } : {}),
         maxIterationsPerPhase: options.maxIterations,
         networkAccess: options.network,
@@ -158,6 +172,7 @@ await program.parseAsync();
 interface CliRunOptions {
   cwd: string;
   model?: string;
+  localProvider?: string;
   maxIterations: number;
   network: boolean;
   logDir: string;
@@ -167,6 +182,10 @@ interface CliRunOptions {
   exclude: string[];
   list: boolean;
   verbose: boolean;
+}
+
+function defaultLocalModel(provider: string | undefined): string | undefined {
+  return provider === "ollama" ? DEFAULT_OLLAMA_MODEL : undefined;
 }
 
 interface CliLogOptions {

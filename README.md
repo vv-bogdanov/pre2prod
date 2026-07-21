@@ -76,6 +76,7 @@ pre2prod [instructions...]
 Options:
   -C, --cwd <path>            repository directory
   --model <model>             Codex model (defaults to Codex CLI setting)
+  --local-provider <provider> run Codex with a local provider (ollama or lmstudio)
   --max-iterations <n>        worker iterations per phase (default: 2)
   --no-network                disable network for worker execution turns
   --codex-bin <path>          Codex executable
@@ -93,6 +94,13 @@ Use `--dev` to force rebuild explicitly (or `PRE2PROD_DEV=1` as legacy override)
 
 ```bash
 pre2prod -C . -o --max-iterations 1
+```
+
+For a local Ollama run, Pre2prod starts Codex as `codex --oss --local-provider ollama app-server`.
+Ollama defaults to `gemma4-12b-coder-fable5-q4km:latest`; pass `--model` to override it.
+
+```bash
+pre2prod --local-provider ollama -p foundation-immediate-risk-triage
 ```
 
 `pre2prod logs` reads run logs in `.pre2prod/logs` (or `--log-dir` override):
