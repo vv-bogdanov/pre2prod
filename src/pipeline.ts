@@ -79,7 +79,7 @@ export class Pre2prodPipeline {
         threadId: reviewer.id,
         prompt: initialDiscoveryPrompt(options.instructions),
         cwd: options.cwd,
-        sandbox: "readOnly",
+        sandbox: "read-only",
         outputSchema: REVIEW_RESULT_SCHEMA,
         logContext: {
           runId,
@@ -215,7 +215,7 @@ export class Pre2prodPipeline {
           threadId: reviewerThreadId,
           prompt: phaseReviewPrompt(phase, options.instructions, isRepeat),
           cwd: options.cwd,
-          sandbox: "readOnly",
+          sandbox: "read-only",
           outputSchema: REVIEW_RESULT_SCHEMA,
           logContext: reviewLogContext,
         });
@@ -361,7 +361,7 @@ export class Pre2prodPipeline {
             options.instructions,
           ),
           cwd: options.cwd,
-          sandbox: "workspaceWrite",
+          sandbox: "workspace-write",
           networkAccess: false,
           logContext: planningContext,
         });
@@ -411,7 +411,7 @@ export class Pre2prodPipeline {
             options.instructions,
           ),
           cwd: options.cwd,
-          sandbox: "workspaceWrite",
+          sandbox: "workspace-write",
           networkAccess: options.networkAccess,
           logContext: executionContext,
         });
