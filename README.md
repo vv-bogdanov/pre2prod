@@ -1,4 +1,4 @@
-# Pre2prod 💩→🍭
+# pre2prod 💩→🍭
 
 From vibe-coded PoC to production-ready MVP.
 
