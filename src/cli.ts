@@ -381,8 +381,11 @@ function formatRuntimeValue(
 }
 
 function parseNonNegativeInteger(value: string): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || parsed < 0) {
+  if (!/^\d+$/.test(value)) {
+    throw new InvalidArgumentError("Expected a non-negative integer");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
     throw new InvalidArgumentError("Expected a non-negative integer");
   }
   return parsed;
