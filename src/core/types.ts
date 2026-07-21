@@ -1,9 +1,6 @@
-export type ReviewStatus = "PASS" | "NEEDS_WORK";
-
 export interface ReviewResult {
-  status: ReviewStatus;
-  findings: string[];
-  summary?: string | undefined;
+  blockers: string[];
+  non_blockers: string[];
 }
 
 export interface Phase {
