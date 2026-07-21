@@ -96,8 +96,9 @@ Use `--dev` to force rebuild explicitly (or `PRE2PROD_DEV=1` as legacy override)
 pre2prod -C . -o --max-iterations 1
 ```
 
+In a source checkout, `dev.env` configures the default development provider and model. It is loaded only for dev mode, so installed and normal runs keep Codex defaults. CLI flags override `dev.env`.
+
 For a local Ollama run, Pre2prod starts Codex as `codex --oss --local-provider ollama app-server`.
-Ollama defaults to `gemma4-12b-coder-fable5-q4km:latest`; pass `--model` to override it.
 
 ```bash
 pre2prod --local-provider ollama -p foundation-immediate-risk-triage

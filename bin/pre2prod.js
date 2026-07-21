@@ -23,6 +23,10 @@ const isDevMode =
 const cleanedArgs = args.filter((arg) => arg !== "--dev");
 
 if (isDevMode) {
+  const devEnvPath = resolve(projectRoot, "dev.env");
+  if (existsSync(devEnvPath)) {
+    process.loadEnvFile(devEnvPath);
+  }
   console.log(`[pre2prod] rebuilding TypeScript CLI at ${projectRoot}`);
   const buildResult = spawnSync("pnpm", ["run", "build"], {
     cwd: projectRoot,
@@ -37,5 +41,9 @@ if (isDevMode) {
 const child = spawnSync(process.execPath, [cliPath, ...cleanedArgs], {
   stdio: "inherit",
   shell: process.platform === "win32",
+  env: {
+    ...process.env,
+    ...(isDevMode ? { PRE2PROD_DEV_ACTIVE: "1" } : {}),
+  },
 });
 process.exit(child.status ?? 1);

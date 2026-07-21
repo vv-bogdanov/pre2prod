@@ -10,6 +10,7 @@ import { loadPhases } from "./phases.js";
 import { Pre2prodPipeline } from "./pipeline.js";
 import { ConsoleProgressReporter } from "./progress.js";
 import { createRunId, FileRunLogger } from "./logging.js";
+import { resolveRuntimeConfig } from "./runtime-config.js";
 import {
   collectPhaseIds,
   formatPhaseList,
@@ -17,7 +18,6 @@ import {
 } from "./phase-selection.js";
 
 const VERSION = "0.1.0";
-const DEFAULT_OLLAMA_MODEL = "gemma4-12b-coder-fable5-q4km:latest";
 const program = new Command();
 
 program
@@ -57,7 +57,7 @@ program
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliRunOptions) => {
     const cwd = resolve(options.cwd);
-    const model = options.model ?? defaultLocalModel(options.localProvider);
+    const runtimeConfig = resolveRuntimeConfig(options);
     const reporter = new ConsoleProgressReporter(
       options.verbose,
       options.observe || options.verbose,
@@ -85,19 +85,28 @@ program
         return;
       }
 
-      reporter.info(
-        `Provider: ${options.localProvider ?? "Codex default"} · model: ${model ?? "Codex default"}`,
+      const providerLabel = formatRuntimeValue(
+        runtimeConfig.provider,
+        runtimeConfig.providerSource,
+        "Codex default",
       );
+      const modelLabel = formatRuntimeValue(
+        runtimeConfig.model,
+        runtimeConfig.modelSource,
+        "Codex default",
+      );
+      reporter.info(`Provider: ${providerLabel} · model: ${modelLabel}`);
+      logger.log("info", "cli.runtime.selected", {
+        provider: runtimeConfig.provider ?? "codex-default",
+        providerSource: runtimeConfig.providerSource,
+        model: runtimeConfig.model ?? "codex-default",
+        modelSource: runtimeConfig.modelSource,
+      });
       const runtime = new AppServerRuntime({
         command: options.codexBin,
-        args: [
-          ...(options.localProvider
-            ? ["--oss", "--local-provider", options.localProvider]
-            : []),
-          "app-server",
-        ],
+        args: runtimeConfig.codexArgs,
         cwd,
-        ...(model ? { model } : {}),
+        ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
         reporter,
         logger,
         clientVersion: VERSION,
@@ -106,7 +115,7 @@ program
 
       await pipeline.run({
         cwd,
-        ...(model ? { model } : {}),
+        ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
         ...(additionalInstructions ? { instructions: additionalInstructions } : {}),
         maxIterationsPerPhase: options.maxIterations,
         networkAccess: options.network,
@@ -182,10 +191,6 @@ interface CliRunOptions {
   exclude: string[];
   list: boolean;
   verbose: boolean;
-}
-
-function defaultLocalModel(provider: string | undefined): string | undefined {
-  return provider === "ollama" ? DEFAULT_OLLAMA_MODEL : undefined;
 }
 
 interface CliLogOptions {
@@ -317,6 +322,14 @@ function getString(value: unknown): string | undefined {
 
 function getInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+}
+
+function formatRuntimeValue(
+  value: string | undefined,
+  source: "cli" | "dev" | "default",
+  fallback: string,
+): string {
+  return `${value ?? fallback}${source === "default" ? "" : ` (${source})`}`;
 }
 
 function parseNonNegativeInteger(value: string): number {
