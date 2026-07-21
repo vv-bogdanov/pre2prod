@@ -12,16 +12,23 @@ for deployment — almost automatically.
 
 **One command. A sequence of expert reviews. A repository prepared for real staging.**
 
-Pre2prod is a TypeScript CLI that uses Codex to improve an existing repository through a simple reviewer-led loop:
+Pre2prod is a TypeScript CLI that uses Codex to improve an existing repository
+through a simple reviewer-led loop. One phase runs as follows:
 
-```text
-persistent Reviewer
-→ review a readiness phase
-→ fork a Worker when material gaps exist
-→ Worker returns a plan → CLI writes PRE2PROD_PLAN.md
-→ set Worker execution goal
-→ Worker executes the plan and completes the goal
-→ Reviewer independently re-reviews the changed repository
+```mermaid
+flowchart TD
+    R0["Persistent Reviewer context<br/>repository discovery and prior phases"] --> R1["Review current phase<br/>read-only, structured findings"]
+    R1 --> B{"Any blockers?"}
+    B -- No --> P["Phase passes<br/>optional checkpoint commit"]
+    P --> N["Next phase<br/>same Reviewer thread"]
+    B -- Yes --> F["Fork Worker from<br/>the exact Reviewer turn"]
+    F --> W0["Worker context<br/>Reviewer context plus blockers"]
+    W0 --> W1["Plan remediation<br/>read-only turn"]
+    W1 --> PF["CLI writes PRE2PROD_PLAN.md"]
+    PF --> G["Set execution goal<br/>on the same Worker"]
+    G --> W2["Execute the plan<br/>workspace-write turn"]
+    W2 -. "repository changes only; no Worker transcript" .-> R2["Reviewer independently re-reads<br/>the current repository"]
+    R2 --> B
 ```
 
 ## Status
@@ -55,6 +62,76 @@ Optional free-form direction:
 npx --yes pre2prod \
   "Prefer Railway, preserve the monolith, and avoid paid services"
 ```
+
+## Built-in review phases
+
+### Foundation
+
+- Immediate Risk Triage
+- Reproducible Local Run
+- Core Scope & Critical Journeys
+- Critical Smoke Baseline
+
+### Architecture
+
+- System Shape & Dependency Boundaries
+- Data Model & Persistence
+- Dead Code & Dependency Cleanup
+- Simplification & Deduplication
+
+### Correctness
+
+- Type Safety
+- Runtime Contracts
+- Error Handling
+- Failure Diagnostics
+- Data Integrity & Migrations
+- Consolidation & Cleanup
+
+### Product
+
+- UX Completeness
+- Accessibility
+- Interaction & UI Cleanup
+
+### Verification
+
+- Core Unit & Invariants
+- Integration
+- Contracts & Compatibility
+- End-to-End Critical Journeys
+- Test Suite Cleanup & Stability
+- Static Analysis & Formatting
+
+### Operations
+
+- Observability
+- Reliability & Operability
+- Performance & Resource Efficiency
+- Instrumentation & Runtime Cleanup
+
+### Assurance
+
+- Application Security Hardening
+- Privacy & Sensitive Data
+- Legal & Compliance Readiness
+
+### Cleanup
+
+- Dead Code & Unused Surface
+- Dependencies, Scripts & Configuration
+- Duplication & Consolidation
+- Temporary, Legacy & Debug Artifacts
+- Owned Code Reduction
+
+### Delivery
+
+- CI Quality Gates
+- Release Artifact Integrity
+- Secure Supply Chain
+- Deployment Readiness
+- Staging Verification
+- Documentation & Repository
 
 ## Review Phases Configuration
 
@@ -164,14 +241,8 @@ pre2prod -p foundation,verification -x verification-type-safety
 # show final phase list after filters
 pre2prod --list -p testing,security -x security
 
-# list available phases in grouped view
+# list available phases and selection slugs
 pre2prod --list
-
-Foundation
-  Immediate Risk Triage        foundation-immediate-risk-triage
-  Reproducible Local Run      foundation-reproducible-local-run
-  Core Scope & Critical Journeys foundation-core-scope-critical-journeys
-  Critical Smoke Baseline      foundation-critical-smoke-baseline
 
 # quick grep-like log checks
 pre2prod logs --event phase.review.blockers --phase-id architecture
