@@ -87,8 +87,8 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 ### Product
 
-- [ ] `product-ux-completeness` — UX Completeness
-- [ ] `product-accessibility` — Accessibility
+- [x] `product-ux-completeness` — UX Completeness
+- [x] `product-accessibility` — Accessibility
 
 ### Verification
 
