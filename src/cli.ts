@@ -48,7 +48,7 @@ program
     [],
   )
   .option("-l, --list", "List available phases and exit", false)
-  .option("-o, --observe", "Stream thinking, command, and file-change telemetry", false)
+  .option("-o, --observe", "Stream thinking, command, and file-change telemetry", true)
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliRunOptions) => {
     const cwd = resolve(options.cwd);
