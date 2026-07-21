@@ -77,7 +77,7 @@ pre2prod [instructions...]
 
 Options:
   -C, --cwd <path>            repository directory
-  --model <model>             Codex model (default: gpt-5.6)
+  --model <model>             Codex model (defaults to Codex CLI setting)
   --max-iterations <n>        worker iterations per phase (default: 2)
   --no-network                disable network for worker execution turns
   --codex-bin <path>          Codex executable
