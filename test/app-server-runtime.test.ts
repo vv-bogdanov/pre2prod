@@ -22,7 +22,7 @@ const phase: Phase = {
 };
 
 describe("Pre2prodPipeline with App Server transport", () => {
-  it("completes the full reviewer-worker-re-review loop over JSONL", async () => {
+  it("completes worker execution when the goal finishes before turn completion", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-e2e-"));
     await initBaseRepository(cwd);
 

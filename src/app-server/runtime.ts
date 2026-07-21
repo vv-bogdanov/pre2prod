@@ -68,6 +68,7 @@ export class AppServerRuntime implements AgentRuntime {
   readonly #clientVersion: string;
   readonly #logger: RunLogger | undefined;
   readonly #collectors = new Map<string, TurnCollector>();
+  readonly #settledTurnIds = new Set<string>();
   readonly #earlyEvents = new Map<
     string,
     { method: string; params: unknown }[]
@@ -273,6 +274,9 @@ export class AppServerRuntime implements AgentRuntime {
 
   #onNotification(method: string, params: unknown): void {
     const turnId = getTurnId(params);
+    if (turnId && this.#settledTurnIds.has(turnId)) {
+      return;
+    }
     if (turnId && !this.#collectors.has(turnId)) {
       const events = this.#earlyEvents.get(turnId) ?? [];
       events.push({ method, params });
@@ -284,12 +288,14 @@ export class AppServerRuntime implements AgentRuntime {
   }
 
   #applyNotification(method: string, params: unknown): void {
+    if (method === "thread/goal/updated") {
+      this.#applyGoalUpdated(params);
+      return;
+    }
+
     const turnId = getTurnId(params);
     if (!turnId) {
-      if (
-        method === "thread/goal/updated" ||
-        method === "thread/goal/cleared"
-      ) {
+      if (method === "thread/goal/cleared") {
         return;
       }
       if (method === "warning" || method === "configWarning") {
@@ -455,8 +461,6 @@ export class AppServerRuntime implements AgentRuntime {
         ...(collector.usage !== undefined ? { usage: collector.usage } : {}),
         ...(error ? { error } : {}),
       };
-      this.#collectors.delete(turnId);
-
       if (normalizedStatus !== "completed") {
         this.#reporter?.warning(
           `App Server turn ${normalizedStatus}: ${error ?? "no error details"}`,
@@ -467,6 +471,7 @@ export class AppServerRuntime implements AgentRuntime {
           status: normalizedStatus,
           error,
         });
+        this.#discardCollector(collector);
         collector.reject(
           new TurnFailedError(
             error ?? `Turn ${turnId} ended with status ${normalizedStatus}`,
@@ -487,9 +492,66 @@ export class AppServerRuntime implements AgentRuntime {
           usage: collector.usage,
           textLength: collector.text.length,
         });
-        collector.resolve(result);
+        this.#settleCollector(collector, result);
       }
     }
+  }
+
+  #applyGoalUpdated(params: unknown): void {
+    const goal = getObject(params, "goal");
+    const threadId = getString(params, "threadId");
+    const status = getString(goal, "status");
+    if (!threadId || !status) {
+      return;
+    }
+
+    const collector = Array.from(this.#collectors.values()).find(
+      (candidate) =>
+        candidate.threadId === threadId &&
+        candidate.logContext?.threadRole === "worker" &&
+        candidate.logContext.phaseTurn === "execution",
+    );
+    if (!collector || status === "active" || status === "paused") {
+      return;
+    }
+
+    const turnId = collector.turnId;
+    if (status === "complete") {
+      this.#logger?.log("info", "runtime.turn.completed", {
+        ...this.#collectorContext(collector),
+        turnId,
+        status: "completed",
+        completedBy: "goal",
+      });
+      this.#settleCollector(collector, {
+        turnId,
+        status: "completed",
+        text: collector.text,
+        ...(collector.diff !== undefined ? { diff: collector.diff } : {}),
+        ...(collector.usage !== undefined ? { usage: collector.usage } : {}),
+      });
+      return;
+    }
+
+    const error = `Worker goal ended with status: ${status}`;
+    this.#logger?.log("error", "runtime.turn.failed", {
+      ...this.#collectorContext(collector),
+      turnId,
+      status,
+      error,
+    });
+    this.#discardCollector(collector);
+    collector.reject(new TurnFailedError(error));
+  }
+
+  #settleCollector(collector: TurnCollector, result: TurnResult): void {
+    this.#discardCollector(collector);
+    collector.resolve(result);
+  }
+
+  #discardCollector(collector: TurnCollector): void {
+    this.#settledTurnIds.add(collector.turnId);
+    this.#collectors.delete(collector.turnId);
   }
 
   #collectorContext(collector: TurnCollector): Record<string, unknown> {

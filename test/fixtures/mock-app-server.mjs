@@ -203,6 +203,16 @@ input.on("line", async (line) => {
       prompt.includes("read PRE2PROD_PLAN.md and execute it completely")
     ) {
       await writeFile(resolve(cwd, "mock-fixed.txt"), "fixed\n", "utf8");
+      const goal = goals.get(message.params.threadId);
+      if (goal) {
+        goal.status = "complete";
+        goal.updatedAt = now();
+        send({
+          method: "thread/goal/updated",
+          params: { threadId: message.params.threadId, turnId, goal },
+        });
+        return;
+      }
       text = "Plan executed.";
     } else if (message.params.outputSchema) {
       const fixed = await access(resolve(cwd, "mock-fixed.txt"))
