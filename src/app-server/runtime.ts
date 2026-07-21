@@ -55,6 +55,7 @@ interface TurnCollector {
 export interface AppServerRuntimeOptions extends JsonRpcClientOptions {
   reporter?: ProgressReporter;
   model?: string;
+  modelProvider?: string;
   clientVersion?: string;
   logger?: RunLogger;
 }
@@ -63,6 +64,7 @@ export class AppServerRuntime implements AgentRuntime {
   readonly #client: JsonRpcProcessClient;
   readonly #reporter: ProgressReporter | undefined;
   readonly #model: string | undefined;
+  readonly #modelProvider: string | undefined;
   readonly #clientVersion: string;
   readonly #logger: RunLogger | undefined;
   readonly #collectors = new Map<string, TurnCollector>();
@@ -76,6 +78,7 @@ export class AppServerRuntime implements AgentRuntime {
   public constructor(options: AppServerRuntimeOptions) {
     this.#reporter = options.reporter;
     this.#model = options.model;
+    this.#modelProvider = options.modelProvider;
     this.#clientVersion = options.clientVersion ?? "0.1.0";
     this.#logger = options.logger;
     this.#client = new JsonRpcProcessClient(options);
@@ -115,6 +118,7 @@ export class AppServerRuntime implements AgentRuntime {
       {
         cwd: options.cwd,
         model: options.model ?? this.#model,
+        ...(this.#modelProvider ? { modelProvider: this.#modelProvider } : {}),
         approvalPolicy: "never",
         sandbox: "read-only",
         serviceName: "pre2prod",
@@ -124,6 +128,7 @@ export class AppServerRuntime implements AgentRuntime {
       threadId: response.thread.id,
       cwd: options.cwd,
       requestedModel: options.model ?? this.#model,
+      requestedModelProvider: this.#modelProvider,
     });
     return {
       id: response.thread.id,

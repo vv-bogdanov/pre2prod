@@ -122,6 +122,9 @@ program
         args: runtimeConfig.codexArgs,
         cwd,
         ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
+        ...(runtimeConfig.provider
+          ? { modelProvider: runtimeConfig.provider }
+          : {}),
         reporter,
         logger,
         clientVersion: VERSION,

@@ -88,6 +88,24 @@ describe("Pre2prodPipeline with App Server transport", () => {
       "App Server error (retrying): temporary mock error",
     );
   });
+
+  it("passes the local provider when starting a thread", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-provider-"));
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      modelProvider: "ollama",
+      env: { ...process.env, MOCK_EXPECT_MODEL_PROVIDER: "ollama" },
+    });
+
+    try {
+      await runtime.initialize();
+      await runtime.startThread({ cwd });
+    } finally {
+      await runtime.close();
+    }
+  });
 });
 
 async function initBaseRepository(cwd: string): Promise<void> {

@@ -25,6 +25,19 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "thread/start") {
+    if (
+      process.env.MOCK_EXPECT_MODEL_PROVIDER &&
+      message.params.modelProvider !== process.env.MOCK_EXPECT_MODEL_PROVIDER
+    ) {
+      send({
+        id: message.id,
+        error: {
+          code: -32602,
+          message: "Unexpected model provider",
+        },
+      });
+      return;
+    }
     const id = `thread-${++threadCounter}`;
     send({ id: message.id, result: { thread: { id, sessionId: id } } });
     send({ method: "thread/started", params: { thread: { id } } });
