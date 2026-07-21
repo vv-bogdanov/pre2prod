@@ -1,62 +1,70 @@
-## План миграции Reviewer решений на структурный JSON
+# План миграции Reviewer на структурный JSON
 
-### Цель
-Перевести решения Reviewer с `PASS`/`NEEDS_WORK` на `ReviewResult` через `outputSchema` у `turn/start` без изменения семантики пайплайна.
+## Цель
+Перевести результаты `Reviewer` с текстовых статусов на строго валидируемую JSON-структуру, сохранив текущий Reviewer/Worker процесс без изменений его семантики.
 
-### Фаза 1. Контракты и модели
-- В `src/core/types.ts` заменить типы решения Reviewer:
-  - `ReviewStatus` удалить,
-  - `ReviewResult` сделать `{ blockers: string[]; non_blockers: string[] }`.
-- В `src/reviewer.ts` ввести и экспортировать `REVIEW_RESULT_SCHEMA` как в ТЗ:
-  - только `blockers` и `non_blockers`, массивы строк, `additionalProperties: false`.
-- Обновить экспорт из `src/index.ts` при необходимости.
-- Убрать устаревшие упоминания `status`, `PASS`, `NEEDS_WORK` из Reviewer-модулей.
+## Этап 1. Контракт
+1. Обновить `src/core/types.ts`:
+   - удалить `ReviewStatus`;
+   - оставить `ReviewResult = { blockers: string[]; non_blockers: string[] }`.
+2. Обновить `src/reviewer.ts`:
+   - экспортировать `REVIEW_RESULT_SCHEMA`:
+   ```ts
+   type: "object",
+   properties: {
+     blockers: { type: "array", items: { type: "string" } },
+     non_blockers: { type: "array", items: { type: "string" } },
+   },
+   required: ["blockers", "non_blockers"],
+   additionalProperties: false
+   ```
+3. Проверить и выровнять экспорт в `src/index.ts` (новые публичные сущности, без лишнего).
 
-### Фаза 2. Парсинг и валидация Reviewer-ответа
-- В `parseReviewResult(text)`:
-  - оставить только строгий JSON+валидацию по `REVIEW_RESULT_SCHEMA`,
-  - explicit fail на malformed output,
-  - удалить fallback, regex и совместимость со старой формой.
-- Проверить, что валидация требует ровно два массива строк и ничего лишнего.
+## Этап 2. Валидация Reviewer результата
+1. Переписать `parseReviewResult` на строгий путь:
+   - `JSON.parse`
+   - валидация по схеме
+   - нормализация строк
+2. Удалить старую логику:
+   - parsing текстовых статусов,
+   - regex status,
+   - fallback на старый контракт и совместимость.
+3. Любой malformed/неподходящий JSON — это явная ошибка пайплайна.
 
-### Фаза 3. Промпт и runTurn для Reviewer/Worker
-- В `src/prompts.ts` в prompt фазы Reviewer append exact postfix:
-  - `Put only material findings that justify another change cycle in blockers; put optional improvements in non_blockers.`
-- Удалить статусные инструкции из Reviewer prompt (`PASS`/`NEEDS_WORK`).
-- В `src/pipeline.ts`:
-  - Reviewer `turn/start` всегда получает `outputSchema: REVIEW_RESULT_SCHEMA`,
-  - Worker turns не получают `outputSchema`.
-- Критерий pass-фазы: `review.blockers.length === 0`.
-- Worker запускается только при непустых `blockers`.
-- В Worker pipeline передаём только `blockers` (если есть), `non_blockers` не передаём.
-- Сохранить:
-  - постоянный Reviewer thread,
-  - fork Worker от **конкретного** reviewer turn с blockers,
-  - `PRE2PROD_PLAN.md` contract,
-  - текущий лимит итераций на фазу.
+## Этап 3. Промпты и оркестратор
+1. `src/prompts.ts`:
+   - в конец review prompt добавить точный postfix:
+   `Put only material findings that justify another change cycle in blockers; put optional improvements in non_blockers.`
+   - убрать инструкции с `PASS` / `NEEDS_WORK`.
+2. `src/pipeline.ts`:
+   - pass `outputSchema: REVIEW_RESULT_SCHEMA` во все reviewer `turn/start`;
+   - не передавать `outputSchema` в worker turns;
+   - считать фазу пройденной при `review.blockers.length === 0`;
+   - запускать Worker только при непустых `blockers`;
+   - в `workerPlanningPrompt/workerExecutionPrompt` передавать только `blockers`;
+   - не терять для Reviewer persistent thread и fork именно от turn reviewer с blockers;
+   - сохранить лимит `maxIterationsPerPhase`.
 
-### Фаза 4. Тесты и фиксы совместимости
-- `test/reviewer.test.ts`:
-  - новые кейсы `blockers`/`non_blockers`,
-  - malformed output fails explicitly.
-- `test/pipeline.test.ts`:
-  - пустые blockers проходят фазу,
-  - non_blockers не триггерят Worker,
-  - blockers триггерят Worker,
-  - Worker получает blockers, но не non_blockers,
-  - outputSchema есть в Reviewer turns,
-  - outputSchema нет у Worker turns,
-  - malformed reviewer output падает явно,
-  - сохраняется persistent Reviewer и fork от exact-review turn,
-  - фаза может пройти после Worker цикла,
-  - лимит итераций всё ещё останавливает фазу.
-- `test/app-server-runtime.test.ts`: проверка reviewer-результата с новым schema.
-- `test/fixtures/mock-app-server.mjs`: обновить mock-ответы Reviewer на `blockers/non_blockers`.
+## Этап 4. Тесты и фикстуры
+1. `test/reviewer.test.ts`:
+   - валидный разбор `blockers`/`non_blockers`;
+   - ошибки для malformed/неполной/лишней структуры.
+2. `test/pipeline.test.ts`:
+   - pass по пустым blockers;
+   - non_blockers не вызывают Worker;
+   - blockers вызывают Worker;
+   - Worker получает только blockers;
+   - reviewer turns с `outputSchema`, worker turns без;
+   - malformed reviewer output => explicit throw;
+   - persistent reviewer и exact-turn fork сохранены;
+   - возможный pass после Worker цикла;
+   - лимит итераций останавливает фазу.
+3. Обновить `test/app-server-runtime.test.ts` и `test/fixtures/mock-app-server.mjs` на новый формат.
 
-### Фаза 5. Финальная валидация
-- Запустить:
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run build`
-  - `npm test`
-- После прохождения — короткий отчёт по результатам и список изменений, без расширения функциональности сверх контракта.
+## Этап 5. Проверка
+1. Запустить подряд:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `npm run build`
+   - `npm test`
+2. Критерий готовности: все проверки зелёные, логика оставлена строго в рамках миграции.

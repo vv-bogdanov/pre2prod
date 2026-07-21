@@ -56,6 +56,7 @@ export class Pre2prodPipeline {
         prompt: initialDiscoveryPrompt(options.instructions),
         cwd: options.cwd,
         sandbox: "readOnly",
+        outputSchema: REVIEW_RESULT_SCHEMA,
       });
 
       const summaries: PhaseSummary[] = [];
