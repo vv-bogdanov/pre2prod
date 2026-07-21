@@ -273,6 +273,11 @@ export class AppServerRuntime implements AgentRuntime {
   }
 
   #onNotification(method: string, params: unknown): void {
+    if (method === "thread/goal/updated") {
+      this.#applyNotification(method, params);
+      return;
+    }
+
     const turnId = getTurnId(params);
     if (turnId && this.#settledTurnIds.has(turnId)) {
       return;

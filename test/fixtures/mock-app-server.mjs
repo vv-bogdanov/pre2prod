@@ -209,7 +209,11 @@ input.on("line", async (line) => {
         goal.updatedAt = now();
         send({
           method: "thread/goal/updated",
-          params: { threadId: message.params.threadId, turnId, goal },
+          params: {
+            threadId: message.params.threadId,
+            turnId: "goal-turn",
+            goal,
+          },
         });
         return;
       }
