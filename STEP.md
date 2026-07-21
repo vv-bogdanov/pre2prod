@@ -21,7 +21,7 @@ a consolidated report and recommendations for the CLI's MVP scope.
   and merge decision are reviewed.
 - Wait for an agent turn to complete instead of polling its status. If a
   progress check is necessary, perform it no more often than once every
-  30 minutes.
+  15 minutes.
 - If a wave stops on a failed phase, preserve its root Worker plan and diff,
   inspect them before deciding whether to fix and rerun the phase.
 - Treat non-applicable phases as an evidence-based PASS, not a reason to add
