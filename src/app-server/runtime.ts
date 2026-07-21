@@ -1,12 +1,17 @@
 import type {
   AgentRuntime,
+  ThreadGoal,
+  ThreadGoalRequest,
   ProgressReporter,
   ThreadRef,
   TurnRequest,
   TurnResult,
 } from "../core/types.js";
 import { ProtocolError, TurnFailedError } from "../core/errors.js";
-import { JsonRpcProcessClient, type JsonRpcClientOptions } from "./json-rpc-client.js";
+import {
+  JsonRpcProcessClient,
+  type JsonRpcClientOptions,
+} from "./json-rpc-client.js";
 
 interface ThreadResponse {
   thread: {
@@ -20,6 +25,18 @@ interface TurnStartResponse {
     id: string;
     status: string;
   };
+}
+
+interface ThreadGoalResponse {
+  goal: ThreadGoal;
+}
+
+interface ThreadGoalGetResponse {
+  goal: ThreadGoal | null;
+}
+
+interface ThreadGoalClearResponse {
+  cleared: boolean;
 }
 
 interface TurnCollector {
@@ -43,7 +60,10 @@ export class AppServerRuntime implements AgentRuntime {
   readonly #model: string | undefined;
   readonly #clientVersion: string;
   readonly #collectors = new Map<string, TurnCollector>();
-  readonly #earlyEvents = new Map<string, { method: string; params: unknown }[]>();
+  readonly #earlyEvents = new Map<
+    string,
+    { method: string; params: unknown }[]
+  >();
   #initialized = false;
   #unsubscribe: (() => void) | undefined;
 
@@ -75,22 +95,33 @@ export class AppServerRuntime implements AgentRuntime {
     this.#initialized = true;
   }
 
-  public async startThread(options: { cwd: string; model?: string }): Promise<ThreadRef> {
+  public async startThread(options: {
+    cwd: string;
+    model?: string;
+  }): Promise<ThreadRef> {
     this.#assertInitialized();
-    const response = await this.#client.request<ThreadResponse>("thread/start", {
-      cwd: options.cwd,
-      model: options.model ?? this.#model,
-      approvalPolicy: "never",
-      sandbox: "readOnly",
-      serviceName: "pre2prod",
-    });
+    const response = await this.#client.request<ThreadResponse>(
+      "thread/start",
+      {
+        cwd: options.cwd,
+        model: options.model ?? this.#model,
+        approvalPolicy: "never",
+        sandbox: "readOnly",
+        serviceName: "pre2prod",
+      },
+    );
     return {
       id: response.thread.id,
-      ...(response.thread.sessionId ? { sessionId: response.thread.sessionId } : {}),
+      ...(response.thread.sessionId
+        ? { sessionId: response.thread.sessionId }
+        : {}),
     };
   }
 
-  public async forkThread(threadId: string, lastTurnId: string): Promise<ThreadRef> {
+  public async forkThread(
+    threadId: string,
+    lastTurnId: string,
+  ): Promise<ThreadRef> {
     this.#assertInitialized();
     const response = await this.#client.request<ThreadResponse>("thread/fork", {
       threadId,
@@ -99,29 +130,34 @@ export class AppServerRuntime implements AgentRuntime {
     });
     return {
       id: response.thread.id,
-      ...(response.thread.sessionId ? { sessionId: response.thread.sessionId } : {}),
+      ...(response.thread.sessionId
+        ? { sessionId: response.thread.sessionId }
+        : {}),
     };
   }
 
   public async runTurn(request: TurnRequest): Promise<TurnResult> {
     this.#assertInitialized();
 
-    const response = await this.#client.request<TurnStartResponse>("turn/start", {
-      threadId: request.threadId,
-      input: [{ type: "text", text: request.prompt }],
-      cwd: request.cwd,
-      approvalPolicy: "never",
-      sandboxPolicy:
-        request.sandbox === "readOnly"
-          ? { type: "readOnly" }
-          : {
-              type: "workspaceWrite",
-              writableRoots: [request.cwd],
-              networkAccess: request.networkAccess ?? true,
-            },
-      model: this.#model,
-      ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
-    });
+    const response = await this.#client.request<TurnStartResponse>(
+      "turn/start",
+      {
+        threadId: request.threadId,
+        input: [{ type: "text", text: request.prompt }],
+        cwd: request.cwd,
+        approvalPolicy: "never",
+        sandboxPolicy:
+          request.sandbox === "readOnly"
+            ? { type: "readOnly" }
+            : {
+                type: "workspaceWrite",
+                writableRoots: [request.cwd],
+                networkAccess: request.networkAccess ?? true,
+              },
+        model: this.#model,
+        ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
+      },
+    );
 
     const turnId = response.turn.id;
     const result = new Promise<TurnResult>((resolve, reject) => {
@@ -146,6 +182,43 @@ export class AppServerRuntime implements AgentRuntime {
     return await result;
   }
 
+  public async setThreadGoal(
+    threadId: string,
+    goal: ThreadGoalRequest,
+  ): Promise<ThreadGoal> {
+    this.#assertInitialized();
+    const response = await this.#client.request<ThreadGoalResponse>(
+      "thread/goal/set",
+      {
+        threadId,
+        ...(goal.objective !== undefined ? { objective: goal.objective } : {}),
+        ...(goal.status !== undefined ? { status: goal.status } : {}),
+        ...(goal.tokenBudget !== undefined
+          ? { tokenBudget: goal.tokenBudget }
+          : {}),
+      },
+    );
+    return response.goal;
+  }
+
+  public async getThreadGoal(threadId: string): Promise<ThreadGoal | null> {
+    this.#assertInitialized();
+    const response = await this.#client.request<ThreadGoalGetResponse>(
+      "thread/goal/get",
+      { threadId },
+    );
+    return response.goal;
+  }
+
+  public async clearThreadGoal(threadId: string): Promise<boolean> {
+    this.#assertInitialized();
+    const response = await this.#client.request<ThreadGoalClearResponse>(
+      "thread/goal/clear",
+      { threadId },
+    );
+    return response.cleared;
+  }
+
   public async close(): Promise<void> {
     this.#unsubscribe?.();
     await this.#client.close();
@@ -166,6 +239,12 @@ export class AppServerRuntime implements AgentRuntime {
   #applyNotification(method: string, params: unknown): void {
     const turnId = getTurnId(params);
     if (!turnId) {
+      if (
+        method === "thread/goal/updated" ||
+        method === "thread/goal/cleared"
+      ) {
+        return;
+      }
       if (method === "warning" || method === "configWarning") {
         this.#reporter?.warning(getMessage(params) ?? method);
       }
@@ -194,8 +273,10 @@ export class AppServerRuntime implements AgentRuntime {
         collector.text = item.text;
       }
       if (item.type === "commandExecution") {
-        const command = typeof item.command === "string" ? item.command : "command";
-        const status = typeof item.status === "string" ? item.status : undefined;
+        const command =
+          typeof item.command === "string" ? item.command : "command";
+        const status =
+          typeof item.status === "string" ? item.status : undefined;
         this.#reporter?.command(command, status);
       }
       return;
@@ -220,7 +301,9 @@ export class AppServerRuntime implements AgentRuntime {
       const turn = getObject(params, "turn");
       const status = turn?.status;
       const normalizedStatus =
-        status === "completed" || status === "interrupted" || status === "failed"
+        status === "completed" ||
+        status === "interrupted" ||
+        status === "failed"
           ? status
           : "failed";
       const error = getErrorMessage(turn?.error);
@@ -236,7 +319,9 @@ export class AppServerRuntime implements AgentRuntime {
 
       if (normalizedStatus !== "completed") {
         collector.reject(
-          new TurnFailedError(error ?? `Turn ${turnId} ended with status ${normalizedStatus}`),
+          new TurnFailedError(
+            error ?? `Turn ${turnId} ended with status ${normalizedStatus}`,
+          ),
         );
       } else {
         collector.resolve(result);
@@ -246,7 +331,9 @@ export class AppServerRuntime implements AgentRuntime {
 
   #assertInitialized(): void {
     if (!this.#initialized) {
-      throw new ProtocolError("AppServerRuntime.initialize() must be called first");
+      throw new ProtocolError(
+        "AppServerRuntime.initialize() must be called first",
+      );
     }
   }
 }
@@ -279,15 +366,22 @@ function getMessage(params: unknown): string | undefined {
 }
 
 function getString(value: unknown, key: string): string | undefined {
-  return isRecord(value) && typeof value[key] === "string" ? value[key] : undefined;
+  return isRecord(value) && typeof value[key] === "string"
+    ? value[key]
+    : undefined;
 }
 
-function getObject(value: unknown, key: string): Record<string, unknown> | undefined {
+function getObject(
+  value: unknown,
+  key: string,
+): Record<string, unknown> | undefined {
   return isRecord(value) && isRecord(value[key]) ? value[key] : undefined;
 }
 
 function getErrorMessage(value: unknown): string | undefined {
-  return isRecord(value) && typeof value.message === "string" ? value.message : undefined;
+  return isRecord(value) && typeof value.message === "string"
+    ? value.message
+    : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
