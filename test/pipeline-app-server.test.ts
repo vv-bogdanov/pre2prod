@@ -79,7 +79,10 @@ describe("Pre2prodPipeline with App Server transport", () => {
       await runtime.close();
     }
 
-    expect(thinking).toContain("Inspecting the repository.");
+    expect(thinking).toEqual([
+      "Inspecting the repository.",
+      "The review is complete.",
+    ]);
     expect(commands).toContainEqual({
       command: "git status --short",
       status: "running",

@@ -78,10 +78,9 @@ export class ConsoleProgressReporter implements ProgressReporter {
     const lines = prettyJson ?? splitLines(message);
     const prefix = `      ${contextLabel} think:`;
     if (prettyJson) {
-      for (const [index, line] of lines.entries()) {
-        const continuationPrefix =
-          index === 0 ? `${prefix} ` : " ".repeat(prefix.length + 1);
-        console.log(pc.dim(`${continuationPrefix}${line}`));
+      console.log(pc.dim(prefix));
+      for (const line of lines) {
+        console.log(`      ${colorizeJson(line)}`);
       }
       return;
     }
@@ -171,4 +170,47 @@ function tryPrettyJsonLines(text: string): string[] | null {
   } catch {
     return null;
   }
+}
+
+function colorizeJson(line: string): string {
+  let result = "";
+  let index = 0;
+
+  while (index < line.length) {
+    if (line[index] === '"') {
+      const end = findStringEnd(line, index);
+      const value = line.slice(index, end + 1);
+      const next = line.slice(end + 1).trimStart();
+      result += next.startsWith(":") ? pc.cyan(value) : pc.green(value);
+      index = end + 1;
+      continue;
+    }
+
+    const literal = line
+      .slice(index)
+      .match(/^(true|false|null|-?\d+(?:\.\d+)?)/);
+    if (literal) {
+      result += pc.yellow(literal[0]);
+      index += literal[0].length;
+      continue;
+    }
+
+    result += line[index];
+    index += 1;
+  }
+
+  return result;
+}
+
+function findStringEnd(line: string, start: number): number {
+  for (let index = start + 1; index < line.length; index += 1) {
+    if (line[index] === "\\") {
+      index += 1;
+      continue;
+    }
+    if (line[index] === '"') {
+      return index;
+    }
+  }
+  return line.length - 1;
 }

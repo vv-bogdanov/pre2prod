@@ -32,8 +32,9 @@ describe("ConsoleProgressReporter", () => {
     );
     const joined = lines.join("\n");
     expect(lines).toContain(
-      "      [reviewer/review foundation-immediate-risk-triage#1] think: {",
+      "      [reviewer/review foundation-immediate-risk-triage#1] think:",
     );
+    expect(lines).toContain("      {");
     expect(joined).toContain('  "blockers": [');
     expect(joined).toContain('  "non_blockers": [');
     expect(joined).toContain('"y"');
