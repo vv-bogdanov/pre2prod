@@ -2,13 +2,18 @@
 
 The automated suite validates orchestration against a protocol-faithful mock process. These checks require a real authenticated Codex installation.
 
-- [ ] Record `codex --version`.
+- [x] Record `codex --version` (confirmed locally: `codex-cli 0.144.6`).
 - [ ] Confirm `codex app-server` starts over stdio.
 - [ ] Confirm `initialize` and `initialized` handshake.
 - [ ] Confirm `thread/start` accepts `cwd`, `approvalPolicy`, `sandbox`, and `serviceName`.
 - [ ] Confirm Reviewer turns run under read-only sandbox.
 - [ ] Confirm `outputSchema` produces parseable Reviewer JSON.
 - [ ] Confirm `thread/fork` accepts `lastTurnId` and `ephemeral: true`.
+- [ ] Confirm `thread/goal/set` endpoint shape.
+- [ ] Confirm `thread/goal/get` endpoint shape.
+- [ ] Confirm `thread/goal/clear` endpoint shape.
+- [ ] Confirm `thread/goal/updated` notification shape.
+- [ ] Confirm `thread/goal/cleared` notification shape.
 - [ ] Confirm planning turn writes `PRE2PROD_PLAN.md`.
 - [ ] Confirm execution turn receives workspace-write and configured network access.
 - [ ] Confirm original Reviewer thread can continue after Worker completion.
