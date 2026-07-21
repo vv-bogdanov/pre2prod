@@ -1,0 +1,68 @@
+{
+  "name": "pre2prod",
+  "version": "0.1.0",
+  "description": "Reviewer-led CLI that prepares existing repositories for staging and production-oriented use.",
+  "type": "module",
+  "bin": {
+    "pre2prod": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    ".agents/skills/pre2prod",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "pack:check": "npm pack --dry-run",
+    "clean": "node scripts/clean.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "validate": "npm run format:check && npm run typecheck && npm run lint && npm run test:coverage && npm run build",
+    "codex:schemas": "codex app-server generate-ts --out generated/codex",
+    "prepack": "npm run validate"
+  },
+  "keywords": [
+    "codex",
+    "cli",
+    "production-readiness",
+    "testing",
+    "security",
+    "devops"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.7.0",
+    "globals": "17.7.0",
+    "prettier": "3.9.5",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  },
+  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
+}
