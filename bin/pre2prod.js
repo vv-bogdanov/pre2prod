@@ -17,6 +17,7 @@ const isDevMode =
 const cleanedArgs = args.filter((arg) => arg !== "--dev");
 
 if (isDevMode) {
+  console.log(`[pre2prod] rebuilding TypeScript CLI at ${projectRoot}`);
   const buildResult = spawnSync("pnpm", ["run", "build"], {
     cwd: projectRoot,
     stdio: "inherit",
