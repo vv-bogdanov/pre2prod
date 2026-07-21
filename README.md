@@ -1,19 +1,49 @@
 # pre2prod 💩→🍭
 
-From vibe-coded PoC to production-ready MVP.
+[![npm](https://img.shields.io/npm/v/pre2prod.svg)](https://www.npmjs.com/package/pre2prod)
+[![CI](https://github.com/vv-bogdanov/pre2prod/actions/workflows/ci.yml/badge.svg)](https://github.com/vv-bogdanov/pre2prod/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> Thousands of new products are vibe-coded every day,
-> but only a small fraction ever reach production.
+**A reviewer-led Codex CLI that turns an existing repository into a
+production-ready MVP, one readiness phase at a time.**
 
-Pre2Prod closes that gap with a carefully designed,
-best-practice workflow that progressively restructures,
-validates, tests, hardens, and prepares a repository
-for deployment — almost automatically.
+Pre2prod reviews the real repository, fixes material gaps through temporary
+Worker agents, verifies every change independently, and records phase
+checkpoints in Git. It is noninteractive and adapts its checks to the project's
+actual language, framework, architecture, and scale.
 
-**One command. A sequence of expert reviews. A repository prepared for real staging.**
+> [!IMPORTANT]
+> Pre2prod requires a clean Git repository and an installed, authenticated Codex
+> CLI. It changes source code, but never deploys or performs destructive
+> production operations. Review the resulting diff before using it in staging.
 
-Pre2prod is a TypeScript CLI that uses Codex to improve an existing repository
-through a simple reviewer-led loop. One phase runs as follows:
+## Quick start
+
+Requires Node.js 20.19 or newer, Git, and `codex app-server`.
+
+```bash
+cd /path/to/your/project
+
+# Preview the available review phases.
+npx --yes pre2prod --list
+
+# Run the complete readiness workflow.
+npx --yes pre2prod
+```
+
+Add project-wide direction when needed:
+
+```bash
+npx --yes pre2prod \
+  "Preserve the monolith, prefer Railway, and avoid paid services"
+```
+
+## How it works
+
+Pre2prod keeps one Reviewer thread for the entire run. A phase with no blockers
+passes immediately. Material blockers fork a temporary Worker from the exact
+review turn; that Worker plans in read-only mode, receives a goal, applies the
+plan, and returns control to the persistent Reviewer.
 
 ```mermaid
 flowchart LR
@@ -30,40 +60,80 @@ flowchart LR
     style W fill:#fff4cc,stroke:#b7791f,color:#111827
 ```
 
-## Status
+The Worker transcript is never merged back into the Reviewer context. The
+Reviewer independently re-reads the changed repository. Optional
+`non_blockers` never trigger a Worker.
 
-This is a hackathon MVP. The orchestration, App Server client, prompts, Git
-checkpoints, explicit-only Codex Skill at `.agents/skills/pre2prod/`, mocks, and
-automated tests are implemented. Live compatibility still needs to be verified
-against the installed Codex CLI version.
+By default, a phase gets up to three Worker iterations. If blockers remain,
+Pre2prod warns, records the unresolved findings, and continues to the next
+phase so the final summary can identify phases worth rerunning.
 
-## Requirements
+## Usage
 
-- Node.js >=20.19.0
-- Corepack-managed pnpm 10.14.0 (the version pinned in `packageManager`)
-- an installed and authenticated Codex CLI with `codex app-server`
+Common commands:
 
-## Install and run
+| Command                               | Purpose                                                        |
+| ------------------------------------- | -------------------------------------------------------------- |
+| `pre2prod`                            | Run every selected phase                                       |
+| `pre2prod -l`                         | List phases and their selection slugs                          |
+| `pre2prod -p foundation,architecture` | Include phase groups or exact slugs                            |
+| `pre2prod -x cleanup`                 | Exclude phase groups or exact slugs                            |
+| `pre2prod --no-commit`                | Keep changes uncommitted on the current branch                 |
+| `pre2prod doctor`                     | Check Git, Codex, authentication, and App Server compatibility |
+| `pre2prod logs --stats`               | Summarize previous runs and phase outcomes                     |
+
+Run `pre2prod --help` or `pre2prod logs --help` for the complete option list.
+
+### Selecting phases
+
+`--phases` (`-p`) and `--exclude` (`-x`) accept comma-separated exact slugs,
+group prefixes, or repeated flags. Exclusions are applied after inclusions.
 
 ```bash
-corepack enable
-pnpm install --frozen-lockfile
-pnpm run build
-node dist/cli.js
+# Run two groups in their configured order.
+pre2prod -p foundation,architecture
+
+# Run exact phases.
+pre2prod -p verification-core-unit-invariants,assurance-privacy-sensitive-data
+
+# Run everything except Cleanup and one Delivery phase.
+pre2prod -x cleanup,delivery-documentation-repository
+
+# Preview the final selection without starting Codex.
+pre2prod -l -p verification,assurance -x assurance-legal-compliance-readiness
 ```
 
-After publishing:
+### Controlling a run
 
 ```bash
-npx --yes pre2prod
+# Work in another repository.
+pre2prod -C /path/to/project
+
+# Review one phase, inspect the diff, and commit manually.
+pre2prod -p foundation-immediate-risk-triage --no-commit
+
+# Disable network access for Worker execution tools.
+pre2prod --no-network
+
+# Change the per-phase Worker limit or turn timeout.
+pre2prod --max-iterations 2 --turn-timeout 180
 ```
 
-Optional free-form direction:
+Thinking, commands, file changes, warnings, and errors stream to the terminal by
+default. Use `--verbose` for additional App Server detail.
+
+### Models and local providers
+
+Without flags, Pre2prod uses the model and provider configured by Codex. A model
+or supported local provider can be selected explicitly:
 
 ```bash
-npx --yes pre2prod \
-  "Prefer Railway, preserve the monolith, and avoid paid services"
+pre2prod --model gpt-5.3-codex
+pre2prod --local-provider ollama --model your-local-model
 ```
+
+`--no-network` restricts Worker tools; it does not replace the provider
+connection required by Codex App Server.
 
 ## Built-in review phases
 
@@ -120,15 +190,16 @@ Delivery
   Documentation & Repository
 ```
 
-## Review Phases Configuration
+## Custom phases
 
-Phase prompts are loaded in this order:
+Pre2prod uses the first `phases.yaml` found in this order:
 
-1. `<repo>/.pre2prod/phases.yaml`
+1. `<project>/.pre2prod/phases.yaml`
 2. `$HOME/.pre2prod/phases.yaml`
-3. built-in `resources/phases.yaml`
+3. bundled `resources/phases.yaml`
 
-`phases.yaml` supports a compact format where each phase is a YAML key and a multiline prompt:
+The compact format maps each phase title to a multiline Reviewer prompt. Its
+selection slug is derived from the title.
 
 ```yaml
 "Architecture and maintainability": |
@@ -140,207 +211,118 @@ Security: |
   Focus on exploitable or materially risky gaps.
 ```
 
-`id` is derived from the key as slug (`Architecture and maintainability` → `architecture-and-maintainability`).
+The full format additionally supports `include`, an explicit `phases` list,
+custom IDs, and object-style phase definitions. Includes are resolved relative
+to the YAML file and checked for cycles.
 
-You can still use the full YAML format with `include`, `phases`, and object-style phase definitions when needed.
+## Logs and diagnostics
 
-## CLI
+Every run prints its run ID and writes two bounded JSONL logs under
+`.pre2prod/logs`:
 
-````text
-pre2prod [instructions...]
-
-Options:
-  -C, --cwd <path>            repository directory
-  --model <model>             Codex model (defaults to Codex CLI setting)
-  --local-provider <provider> run Codex with a local provider (ollama or lmstudio)
-  --max-iterations <n>        worker iterations per phase (default: 3)
-  --turn-timeout <minutes>    maximum App Server turn duration (default: 120)
-  --no-network                disable network for worker execution turns
-  --no-commit                 run in the current branch without checkpoint commits
-  --codex-bin <path>          Codex executable
-  -p, --phases <ids>          run only these phases (id or group prefix, comma-separated, can be repeated)
-  -x, --exclude <ids>         exclude phases (id or group prefix, comma-separated, can be repeated)
-  -l, --list                  list phases (after include/exclude filters) and exit
-  -o, --observe               stream reviewer/worker thinking, tools, and file changes (enabled by default)
-  --verbose                   show streamed model and command details
-  --dev                       rebuild from TypeScript before running (development mode)
-
-In a local source checkout (`.git`, `src/`), pre2prod rebuilds automatically before each run.
-For installed/prod usage, no rebuild occurs.
-
-Use `--dev` to force rebuild explicitly (or `PRE2PROD_DEV=1` as legacy override):
+- `pre2prod-summary.jsonl` contains run and phase lifecycle events;
+- `pre2prod-events.jsonl` contains detailed Reviewer, Worker, command, and
+  protocol events.
 
 ```bash
-pre2prod -C . -o --max-iterations 1
-````
-
-In a source checkout, `dev.env` configures the default development provider and model. It is loaded only for dev mode, so installed and normal runs keep Codex defaults. CLI flags override `dev.env`.
-
-For a local Ollama run, Pre2prod starts Codex as `codex --oss --local-provider ollama app-server`.
-
-```bash
-pre2prod --local-provider ollama -p foundation-immediate-risk-triage
-```
-
-`pre2prod logs` reads run logs in `.pre2prod/logs` (or `--log-dir` override):
-
-Run logs are local JSONL diagnostics. Command text, warnings, errors, review
-findings, and observed model output are redacted before display or persistence;
-high-volume model deltas are represented by lengths only. Each full and summary
-log is bounded at 10 MiB by retaining complete recent JSONL records. If a log
-write fails, Pre2prod emits one warning and continues without persisted
-diagnostics, so the terminal result remains the source of truth for that run.
-
-```text
-pre2prod logs [options]
-
-Options:
-  --stats                    Summarize runs and phases from the summary log
-  --full                     Read full event log instead of summary log
-  -r, --run-id <id>          Filter by run id (exact)
-  -p, --phase-id <id>        Filter by phase id (substring)
-  -i, --iteration <number>   Filter by phase iteration
-  -R, --role <role>          Filter by thread role: reviewer|worker
-  -t, --turn <turn>          Filter by phase turn: review|planning|execution
-  -e, --event <event>        Filter by event name
-  -c, --contains <text>      Filter by text in raw log line
-  -T, --tag <tag>            Filter by text in contextTag
-```
-
-Examples:
-
-```bash
-# run only two phases
-pre2prod -C . -p testing,security
-
-# run all Architecture phases (prefix-based group selection)
-pre2prod -C . -p architecture
-
-# run one phase, review the diff, and commit manually
-pre2prod -p foundation-immediate-risk-triage --no-commit
-
-# run all except security
-pre2prod -x security
-
-# run Foundation and Verification, but skip one verification phase
-pre2prod -p foundation,verification -x verification-type-safety
-
-# show final phase list after filters
-pre2prod --list -p testing,security -x security
-
-# list available phases and selection slugs
-pre2prod --list
-
-# quick grep-like log checks
-pre2prod logs --event phase.review.blockers --phase-id architecture
-pre2prod logs --full --tag p=3/12 --run-id 2026-07-21-...
-
-# summarize run and phase outcomes
+# Aggregate run and phase outcomes.
 pre2prod logs --stats
 pre2prod logs --stats --run-id 2026-07-21-...
+
+# Inspect selected summary or full events.
+pre2prod logs --event phase.review.blockers --phase-id architecture
+pre2prod logs --full --role worker --turn execution
 ```
 
-Before a long run, `pre2prod doctor` checks the Node and Git prerequisites,
-Codex installation and authentication, and a structured read-only App Server
-turn using the selected provider and model:
+Logs are redacted before persistence and limited to 10 MiB per file by
+retaining complete recent records. A logging failure emits a warning but does
+not replace the terminal result.
+
+Before a long run, verify the complete local path with:
 
 ```bash
 pre2prod doctor -C .
 ```
 
+## Git and safety
+
+- Git is required. A missing repository fails with an instruction to run
+  `git init`.
+- The working tree must be clean; Pre2prod never stashes, resets, or cleans user
+  changes.
+- By default, Pre2prod creates `pre2prod/<timestamp>` and commits each phase
+  checkpoint. `--no-commit` keeps changes on the current branch.
+- Reviewer turns are read-only. Only Worker execution turns receive
+  workspace-write access.
+- Plans and default logs are excluded through `.git/info/exclude`, not by
+  modifying the project's `.gitignore`.
+- Pre2prod does not deploy, promote, migrate, or operate production systems.
+
+## Data and privacy
+
+Pre2prod sends repository material, prompts, and tool context required for each
+turn to the selected Codex or local model provider. Provider-side processing
+and retention follow that provider's configuration and terms. Do not run it on
+source or data you are not authorized to share.
+
+Pre2prod itself has no analytics service. Local diagnostics stay under
+`.pre2prod`; remove that directory when its logs, plans, and reports are no
+longer needed.
+
+## Troubleshooting
+
+- **Codex authentication, model, or sandbox errors:** run `pre2prod doctor`,
+  inspect `pre2prod logs`, and consult
+  [`docs/LIVE_COMPATIBILITY_CHECKLIST.md`](docs/LIVE_COMPATIBILITY_CHECKLIST.md).
+- **Long-running turns:** increase `--turn-timeout`; the default is 120 minutes.
+- **Dirty working tree:** commit or stash changes. Pre2prod never does this
+  automatically.
+- **`ERR_PNPM_NO_GLOBAL_BIN_DIR`:** run `pnpm setup`, restart the shell, and
+  confirm `PNPM_HOME` is on `PATH`. During development, use `node dist/cli.js`
+  if global linking remains unavailable.
+
+## Project documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Live Codex compatibility checklist](docs/LIVE_COMPATIBILITY_CHECKLIST.md)
+- [Contributing](CONTRIBUTING.md)
+- [Releasing](RELEASING.md)
+- [Security policy](SECURITY.md)
+
+Report suspected vulnerabilities through GitHub's private vulnerability
+reporting channel as described in `SECURITY.md`. Never include credentials or
+private repository material in a public issue.
+
 ## Development
+
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run build
+node dist/cli.js --list
+```
+
+In a source checkout, `bin/pre2prod.js` rebuilds TypeScript automatically before
+each run. `pnpm run link` installs the current checkout as a global development
+command. `dev.env` can define development-only provider and model defaults; CLI
+flags take precedence.
+
+Run the complete CI and package release gate before committing:
 
 ```bash
 pnpm run release:check
 ```
 
-Current automated baseline:
-
-- formatting, typechecking, linting, test coverage, and TypeScript build;
-- production dependency audit;
-- tarball creation, clean npm installation, and installed CLI smoke with the
-  repository's pinned pnpm version.
-
-Tests include:
-
-- Reviewer structured-result parsing;
-- full pipeline state transitions with a fake runtime;
-- App Server JSON-RPC integration against a mock subprocess;
-- Git precondition and checkpoint commit behavior.
-
-Test-created temporary directories are isolated and removed after each suite.
-
-## Run `pre2prod` from any project
-
-From the checked-out pre2prod repository:
-
-```bash
-pnpm run link
-```
-
-Now you can run directly from any repository:
-
-```bash
-cd /path/to/project
-pre2prod --list
-```
-
-For one-off local runs without global install:
-
-```bash
-node dist/cli.js --list -C /path/to/project
-```
-
-## Troubleshooting
-
-- `ERR_PNPM_NO_GLOBAL_BIN_DIR`: run `pnpm setup`, restart the shell, and confirm
-  `PNPM_HOME` is on `PATH`; use `node dist/cli.js` while developing if global
-  linking is unavailable.
-- Codex authentication, sandbox, or protocol failures: inspect the terminal and
-  `pre2prod logs`, then compare the installed version with
-  `docs/LIVE_COMPATIBILITY_CHECKLIST.md`.
-- Long-running turns: raise `--turn-timeout`; the default is 120 minutes.
-- Dirty-tree errors: review `git status` and commit or stash user changes.
-  Pre2prod never stashes or cleans them automatically.
-
-## Safety boundaries
-
-- noninteractive by design;
-- no destructive production operations;
-- no automatic stash/reset/clean;
-- dirty or missing Git exits with a clear error and instruction to run `git init`;
-- generated plans and default logs are added to the repository-local
-  `.git/info/exclude`, not the project's `.gitignore` or commits;
-- deployment readiness is prepared, not automatically promoted to production;
-- the resulting repository still requires human review before production use.
-
-## Data and privacy
-
-Pre2prod sends repository material, prompts, and tool context needed for each
-turn to the Codex or local model provider selected for the run. Provider-side
-processing and retention are governed by that provider's configuration and
-terms. Do not run Pre2prod on source or data you are not authorized to share
-with the selected provider.
-
-Pre2prod itself has no analytics or telemetry service. It writes redacted,
-bounded diagnostics locally under `.pre2prod/logs`; remove `.pre2prod` when
-those local run artifacts are no longer needed. `--no-network` disables network
-access for Worker execution tools, but it does not replace the model-provider
-connection required by Codex App Server.
+This runs formatting, typechecking, linting, coverage, build, production
+dependency audit, tarball creation, clean installation, and installed CLI
+smoke testing.
 
 ## TODO
 
+- Move shared Reviewer and Worker prompts into layered, overridable YAML
+  resources.
 - Decide how Reviewer `non_blockers` should be retained or surfaced. They must
   remain informational and must not be sent to the Worker.
 - Resume interrupted runs from the last safe phase or turn boundary without
   replaying a Worker side effect whose completion is unknown.
-
-## Security
-
-Please report suspected vulnerabilities privately as described in
-[`SECURITY.md`](SECURITY.md). Do not include credentials, private source, or
-other sensitive data in a public issue.
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
-[`docs/LIVE_COMPATIBILITY_CHECKLIST.md`](docs/LIVE_COMPATIBILITY_CHECKLIST.md),
-[`CONTRIBUTING.md`](CONTRIBUTING.md), and [`RELEASING.md`](RELEASING.md).
+- Add npm trusted publishing after the initial manual release.
