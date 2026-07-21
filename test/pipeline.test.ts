@@ -33,7 +33,10 @@ describe("Pre2prodPipeline", () => {
     const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      JSON.stringify({ blockers: [], non_blockers: ["Optional docs improvement"] }),
+      JSON.stringify({
+        blockers: [],
+        non_blockers: ["Optional docs improvement"],
+      }),
     ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
@@ -52,7 +55,10 @@ describe("Pre2prodPipeline", () => {
     const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      JSON.stringify({ blockers: [], non_blockers: ["Optional docs improvement"] }),
+      JSON.stringify({
+        blockers: [],
+        non_blockers: ["Optional docs improvement"],
+      }),
     ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
@@ -64,7 +70,9 @@ describe("Pre2prodPipeline", () => {
 
     expect(runtime.forks).toHaveLength(0);
     expect(
-      runtime.requests.filter((request) => request.threadId.startsWith("worker")),
+      runtime.requests.filter((request) =>
+        request.threadId.startsWith("worker"),
+      ),
     ).toHaveLength(0);
   });
 
@@ -72,7 +80,10 @@ describe("Pre2prodPipeline", () => {
     const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      JSON.stringify({ blockers: ["Missing a critical test"], non_blockers: [] }),
+      JSON.stringify({
+        blockers: ["Missing a critical test"],
+        non_blockers: [],
+      }),
       "Plan written",
       "Plan executed",
       JSON.stringify({ blockers: [], non_blockers: [] }),
@@ -109,7 +120,10 @@ describe("Pre2prodPipeline", () => {
     const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
-      JSON.stringify({ blockers: ["Gap A", "Gap B"], non_blockers: ["Nice-to-have"] }),
+      JSON.stringify({
+        blockers: ["Gap A", "Gap B"],
+        non_blockers: ["Nice-to-have"],
+      }),
       "Plan written",
       "Plan executed",
       JSON.stringify({ blockers: [], non_blockers: [] }),
@@ -149,7 +163,9 @@ describe("Pre2prodPipeline", () => {
     });
 
     const reviewerReviewTurns = runtime.requests.filter(
-      (request) => request.threadId === "reviewer" && request.prompt.includes("Current phase"),
+      (request) =>
+        request.threadId === "reviewer" &&
+        request.prompt.includes("Current phase"),
     );
     expect(reviewerReviewTurns).toHaveLength(2);
     for (const request of reviewerReviewTurns) {
@@ -291,11 +307,7 @@ class FakeRuntime implements AgentRuntime {
         "# Test plan\n",
         "utf8",
       );
-      await writeFile(
-        resolve(this.#cwd, "mock-fixed.txt"),
-        "fixed\n",
-        "utf8",
-      );
+      await writeFile(resolve(this.#cwd, "mock-fixed.txt"), "fixed\n", "utf8");
     }
     return { turnId: `turn-${++this.#turn}`, status: "completed", text };
   }

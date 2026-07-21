@@ -38,7 +38,9 @@ describe("prepareGit", () => {
     expect((await git(cwd, ["log", "-1", "--pretty=%s"])).trim()).toBe(
       "pre2prod(testing): Testing",
     );
-    expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe("?? PRE2PROD_PLAN.md");
+    expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe(
+      "?? PRE2PROD_PLAN.md",
+    );
     expect(await readFile(resolve(cwd, "app.txt"), "utf8")).toBe("after\n");
   });
 

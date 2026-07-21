@@ -10,22 +10,32 @@ const mockServer = resolve(here, "fixtures/mock-rpc-server.mjs");
 
 describe("JsonRpcProcessClient", () => {
   it("routes notifications and declines unexpected approvals", async () => {
-    const client = new JsonRpcProcessClient({ command: process.execPath, args: [mockServer] });
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: [mockServer],
+    });
     const notification = vi.fn();
     client.onNotification(notification);
 
     await client.start();
     try {
-      const response = await client.request<{ decision: string }>("trigger-approval");
+      const response = await client.request<{ decision: string }>(
+        "trigger-approval",
+      );
       expect(response).toEqual({ decision: "decline" });
-      expect(notification).toHaveBeenCalledWith("mock/notification", { value: 42 });
+      expect(notification).toHaveBeenCalledWith("mock/notification", {
+        value: 42,
+      });
     } finally {
       await client.close();
     }
   });
 
   it("surfaces JSON-RPC failures", async () => {
-    const client = new JsonRpcProcessClient({ command: process.execPath, args: [mockServer] });
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: [mockServer],
+    });
     await client.start();
     try {
       await expect(client.request("fail")).rejects.toThrow(/mock failure/i);

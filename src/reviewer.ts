@@ -5,8 +5,8 @@ import { Pre2prodError } from "./core/errors.js";
 
 const reviewSchema = z
   .object({
-  blockers: z.array(z.string()),
-  non_blockers: z.array(z.string()),
+    blockers: z.array(z.string()),
+    non_blockers: z.array(z.string()),
   })
   .strict();
 
@@ -47,7 +47,9 @@ export function parseReviewResult(text: string): ReviewResult {
   }
 
   return {
-    blockers: parsedResult.data.blockers.map((item) => item.trim()).filter(Boolean),
+    blockers: parsedResult.data.blockers
+      .map((item) => item.trim())
+      .filter(Boolean),
     non_blockers: parsedResult.data.non_blockers
       .map((item) => item.trim())
       .filter(Boolean),

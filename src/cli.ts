@@ -22,9 +22,14 @@ const program = new Command();
 
 program
   .name("pre2prod")
-  .description("Prepare an existing repository for staging with a reviewer-led Codex workflow.")
+  .description(
+    "Prepare an existing repository for staging with a reviewer-led Codex workflow.",
+  )
   .version(VERSION)
-  .argument("[instructions...]", "Additional free-form direction for the whole run")
+  .argument(
+    "[instructions...]",
+    "Additional free-form direction for the whole run",
+  )
   .option("-C, --cwd <path>", "Repository working directory", process.cwd())
   .option("--model <model>", "Codex model")
   .option(
@@ -39,7 +44,11 @@ program
   )
   .option("--no-network", "Disable network access for worker execution turns")
   .option("--log-dir <path>", "Directory for run logs", ".pre2prod/logs")
-  .option("--codex-bin <path>", "Codex executable", process.env.PRE2PROD_CODEX_BIN ?? "codex")
+  .option(
+    "--codex-bin <path>",
+    "Codex executable",
+    process.env.PRE2PROD_CODEX_BIN ?? "codex",
+  )
   .option(
     "-p, --phases <ids>",
     "Run only these phases (comma-separated, can be repeated)",
@@ -53,7 +62,11 @@ program
     [],
   )
   .option("-l, --list", "List available phases and exit", false)
-  .option("-o, --observe", "Stream thinking, command, and file-change telemetry", true)
+  .option(
+    "-o, --observe",
+    "Stream thinking, command, and file-change telemetry",
+    true,
+  )
   .option("--verbose", "Show streamed model and command details", false)
   .action(async (instructions: string[], options: CliRunOptions) => {
     const cwd = resolve(options.cwd);
@@ -79,7 +92,9 @@ program
       );
 
       if (options.list) {
-        for (const phase of formatPhaseList(selectedPhases, { dimSlug: true })) {
+        for (const phase of formatPhaseList(selectedPhases, {
+          dimSlug: true,
+        })) {
           console.log(phase);
         }
         return;
@@ -111,12 +126,19 @@ program
         logger,
         clientVersion: VERSION,
       });
-      const pipeline = new Pre2prodPipeline(runtime, reporter, selectedPhases, logger);
+      const pipeline = new Pre2prodPipeline(
+        runtime,
+        reporter,
+        selectedPhases,
+        logger,
+      );
 
       await pipeline.run({
         cwd,
         ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
-        ...(additionalInstructions ? { instructions: additionalInstructions } : {}),
+        ...(additionalInstructions
+          ? { instructions: additionalInstructions }
+          : {}),
         maxIterationsPerPhase: options.maxIterations,
         networkAccess: options.network,
       });
@@ -136,9 +158,16 @@ program
   .option("--full", "Read full event log instead of summary log", false)
   .option("-r, --run-id <id>", "Filter by run id (exact)")
   .option("-p, --phase-id <id>", "Filter by phase id (substring)")
-  .option("-i, --iteration <number>", "Filter by phase iteration", parseNonNegativeInteger)
+  .option(
+    "-i, --iteration <number>",
+    "Filter by phase iteration",
+    parseNonNegativeInteger,
+  )
   .option("-R, --role <role>", "Filter by thread role: reviewer|worker")
-  .option("-t, --turn <turn>", "Filter by phase turn: review|planning|execution")
+  .option(
+    "-t, --turn <turn>",
+    "Filter by phase turn: review|planning|execution",
+  )
   .option("-e, --event <event>", "Filter by event name")
   .option("-c, --contains <text>", "Filter by text present in raw log line")
   .option("-T, --tag <tag>", "Filter by text present in contextTag")
@@ -228,7 +257,10 @@ interface LogFilters {
   tag: string | undefined;
 }
 
-async function readLogFile(filePath: string, filters: LogFilters): Promise<string[]> {
+async function readLogFile(
+  filePath: string,
+  filters: LogFilters,
+): Promise<string[]> {
   const content = await readFile(filePath, "utf8");
   const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
   const result: string[] = [];
@@ -321,7 +353,9 @@ function getString(value: unknown): string | undefined {
 }
 
 function getInteger(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+  return typeof value === "number" && Number.isInteger(value)
+    ? value
+    : undefined;
 }
 
 function formatRuntimeValue(

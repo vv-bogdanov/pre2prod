@@ -15,9 +15,9 @@ describe("parseReviewResult", () => {
   });
 
   it("enforces both arrays", () => {
-    expect(() =>
-      parseReviewResult('{"blockers":["Only blockers"]}'),
-    ).toThrow(/does not match required structure/i);
+    expect(() => parseReviewResult('{"blockers":["Only blockers"]}')).toThrow(
+      /does not match required structure/i,
+    );
   });
 
   it("requires exact object shape", () => {
@@ -28,9 +28,7 @@ describe("parseReviewResult", () => {
 
   it("rejects unknown fields", () => {
     expect(() =>
-      parseReviewResult(
-        '{"blockers":[],"non_blockers":[],"status":"PASS"}',
-      ),
+      parseReviewResult('{"blockers":[],"non_blockers":[],"status":"PASS"}'),
     ).toThrow(/does not match required structure/i);
   });
 });

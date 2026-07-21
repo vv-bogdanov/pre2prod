@@ -15,7 +15,10 @@ export interface GitSession {
 const GIT_COMMAND_HINT =
   "Initialize a git repository first: run `git init` in the project directory (for example: git init .).";
 
-export async function prepareGit(cwd: string, reporter: ProgressReporter): Promise<GitSession> {
+export async function prepareGit(
+  cwd: string,
+  reporter: ProgressReporter,
+): Promise<GitSession> {
   if (!(await isGitRepository(cwd))) {
     throw new Pre2prodError(`Git repository not detected.
 ${GIT_COMMAND_HINT}`);
@@ -33,7 +36,9 @@ ${GIT_COMMAND_HINT}`);
     await git(cwd, ["switch", "-c", branch]);
     reporter.info(`Git branch: ${branch}`);
   } catch (error) {
-    throw new Pre2prodError(`Could not create Git branch for the run: ${messageOf(error)}`);
+    throw new Pre2prodError(
+      `Could not create Git branch for the run: ${messageOf(error)}`,
+    );
   }
 
   return {
@@ -61,7 +66,9 @@ ${GIT_COMMAND_HINT}`);
           message,
         ]);
       } catch (error) {
-        throw new Pre2prodError(`Git checkpoint commit failed: ${messageOf(error)}`);
+        throw new Pre2prodError(
+          `Git checkpoint commit failed: ${messageOf(error)}`,
+        );
       }
     },
   };
@@ -85,7 +92,12 @@ async function git(
     const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
     return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
   } catch (error) {
-    const record = error as { stdout?: string; stderr?: string; code?: number; message?: string };
+    const record = error as {
+      stdout?: string;
+      stderr?: string;
+      code?: number;
+      message?: string;
+    };
     if (allowNonZero) {
       return {
         stdout: record.stdout ?? "",
@@ -112,7 +124,10 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function normalizePhaseIdentifier(phase: { id: string; title: string }): string {
+function normalizePhaseIdentifier(phase: {
+  id: string;
+  title: string;
+}): string {
   const fromTitle = normalizeCommitSegment(phase.title);
   return fromTitle !== "" ? fromTitle : normalizeCommitSegment(phase.id);
 }

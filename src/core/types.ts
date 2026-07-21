@@ -124,7 +124,10 @@ export interface ProgressReporter {
     context?: Record<string, unknown>,
   ): void;
   thinking(message: string, context?: Record<string, unknown>): void;
-  filesTouched(paths: readonly string[], context?: Record<string, unknown>): void;
+  filesTouched(
+    paths: readonly string[],
+    context?: Record<string, unknown>,
+  ): void;
   waiting(message: string): void;
   verbose(message: string): void;
   completed(result: PipelineResult): void;

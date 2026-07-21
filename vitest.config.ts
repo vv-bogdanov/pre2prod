@@ -10,7 +10,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "html"],
       include: ["src/**/*.ts"],
-      exclude: ["src/cli.ts", "src/index.ts", "src/progress.ts", "src/core/types.ts"],
+      exclude: [
+        "src/cli.ts",
+        "src/index.ts",
+        "src/progress.ts",
+        "src/core/types.ts",
+      ],
       thresholds: {
         lines: 75,
         functions: 75,

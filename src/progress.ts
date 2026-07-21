@@ -79,7 +79,8 @@ export class ConsoleProgressReporter implements ProgressReporter {
     const prefix = `      ${contextLabel} think:`;
     if (prettyJson) {
       for (const [index, line] of lines.entries()) {
-        const continuationPrefix = index === 0 ? `${prefix} ` : " ".repeat(prefix.length + 1);
+        const continuationPrefix =
+          index === 0 ? `${prefix} ` : " ".repeat(prefix.length + 1);
         console.log(pc.dim(`${continuationPrefix}${line}`));
       }
       return;
@@ -124,7 +125,9 @@ export class ConsoleProgressReporter implements ProgressReporter {
     if (result.gitBranch) {
       console.log(`Branch: ${result.gitBranch}`);
     }
-    console.log("Review the resulting repository before production deployment.");
+    console.log(
+      "Review the resulting repository before production deployment.",
+    );
   }
 
   public failed(message: string): void {
@@ -135,8 +138,10 @@ export class ConsoleProgressReporter implements ProgressReporter {
     if (!context) {
       return "";
     }
-    const role = typeof context.threadRole === "string" ? context.threadRole : "agent";
-    const turn = typeof context.phaseTurn === "string" ? context.phaseTurn : "turn";
+    const role =
+      typeof context.threadRole === "string" ? context.threadRole : "agent";
+    const turn =
+      typeof context.phaseTurn === "string" ? context.phaseTurn : "turn";
     const phase =
       typeof context.phaseId === "string" &&
       typeof context.phaseIteration === "number"

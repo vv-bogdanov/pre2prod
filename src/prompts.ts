@@ -89,9 +89,13 @@ export function workerExecutionPrompt(
 
 function userInstructions(instructions?: string): string | undefined {
   const value = instructions?.trim();
-  return value ? `Additional user direction for the whole run:\n${value}` : undefined;
+  return value
+    ? `Additional user direction for the whole run:\n${value}`
+    : undefined;
 }
 
 function joinPrompts(...parts: (string | undefined)[]): string {
-  return parts.filter((part): part is string => Boolean(part?.trim())).join("\n\n---\n\n");
+  return parts
+    .filter((part): part is string => Boolean(part?.trim()))
+    .join("\n\n---\n\n");
 }

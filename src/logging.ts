@@ -121,7 +121,9 @@ export function createRunId(date: Date = new Date()): string {
   return date.toISOString().replace(/[:.]/g, "-");
 }
 
-export function buildContextTag(details: Record<string, unknown>): string | undefined {
+export function buildContextTag(
+  details: Record<string, unknown>,
+): string | undefined {
   const runId =
     typeof details.runId === "string" && details.runId.trim().length > 0
       ? details.runId
@@ -134,7 +136,8 @@ export function buildContextTag(details: Record<string, unknown>): string | unde
   const phaseTotal = normalizeInteger(details.phaseTotal);
   const phaseIteration = normalizeInteger(details.phaseIteration);
   const threadRole =
-    typeof details.threadRole === "string" && details.threadRole.trim().length > 0
+    typeof details.threadRole === "string" &&
+    details.threadRole.trim().length > 0
       ? details.threadRole
       : undefined;
   const phaseTurn =

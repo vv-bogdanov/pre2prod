@@ -51,7 +51,9 @@ describe("FileRunLogger", () => {
     });
 
     const paths = FileRunLogger.paths(cwd);
-    const summaryLines = (await readFile(paths.summary, "utf8")).trim().split("\n");
+    const summaryLines = (await readFile(paths.summary, "utf8"))
+      .trim()
+      .split("\n");
     const fullLines = (await readFile(paths.full, "utf8")).trim().split("\n");
 
     expect(summaryLines).toHaveLength(1);

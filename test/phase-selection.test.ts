@@ -10,16 +10,40 @@ import {
 } from "../src/phase-selection.js";
 
 const phases: readonly Phase[] = [
-  { id: "reproducibility-and-build", title: "Reproducibility and build", reviewerPrompt: "x" },
+  {
+    id: "reproducibility-and-build",
+    title: "Reproducibility and build",
+    reviewerPrompt: "x",
+  },
   { id: "testing", title: "Testing", reviewerPrompt: "x" },
   { id: "security", title: "Security", reviewerPrompt: "x" },
 ];
 const groupedPhases: readonly Phase[] = [
-  { id: "foundation-initial-risk", title: "Foundation: Initial Risk", reviewerPrompt: "x" },
-  { id: "foundation-local-run", title: "Foundation: Local Run", reviewerPrompt: "x" },
-  { id: "architecture-system-shape", title: "Architecture: System Shape", reviewerPrompt: "x" },
-  { id: "architecture-data-model", title: "Architecture: Data Model", reviewerPrompt: "x" },
-  { id: "verification-type-safety", title: "Verification: Type Safety", reviewerPrompt: "x" },
+  {
+    id: "foundation-initial-risk",
+    title: "Foundation: Initial Risk",
+    reviewerPrompt: "x",
+  },
+  {
+    id: "foundation-local-run",
+    title: "Foundation: Local Run",
+    reviewerPrompt: "x",
+  },
+  {
+    id: "architecture-system-shape",
+    title: "Architecture: System Shape",
+    reviewerPrompt: "x",
+  },
+  {
+    id: "architecture-data-model",
+    title: "Architecture: Data Model",
+    reviewerPrompt: "x",
+  },
+  {
+    id: "verification-type-safety",
+    title: "Verification: Type Safety",
+    reviewerPrompt: "x",
+  },
 ];
 
 describe("phase selection", () => {
@@ -66,7 +90,10 @@ describe("phase selection", () => {
 
   it("supports mixed exact and prefix selectors in include order", () => {
     expect(
-      selectPhases(groupedPhases, ["verification", "architecture-system-shape"]),
+      selectPhases(groupedPhases, [
+        "verification",
+        "architecture-system-shape",
+      ]),
     ).toEqual([groupedPhases[4], groupedPhases[2]]);
   });
 
@@ -115,7 +142,9 @@ describe("phase selection", () => {
 
   it("formats grouped phase list with stable grouping markers", () => {
     const lines = formatPhaseList(groupedPhases);
-    const groups = lines.filter((line) => line.length > 0 && !line.startsWith("  "));
+    const groups = lines.filter(
+      (line) => line.length > 0 && !line.startsWith("  "),
+    );
     const rendered = lines.join("\n");
 
     expect(groups).toEqual(["Foundation", "Architecture", "Verification"]);

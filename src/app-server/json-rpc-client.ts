@@ -1,5 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createInterface, type Interface as ReadlineInterface } from "node:readline";
+import {
+  createInterface,
+  type Interface as ReadlineInterface,
+} from "node:readline";
 
 import { ProtocolError } from "../core/errors.js";
 import {
@@ -54,7 +57,10 @@ export class JsonRpcProcessClient {
 
     child.once("error", (error) => {
       this.#rejectAll(
-        new ProtocolError(`Failed to start Codex App Server: ${error.message}`, { cause: error }),
+        new ProtocolError(
+          `Failed to start Codex App Server: ${error.message}`,
+          { cause: error },
+        ),
       );
     });
 
@@ -134,7 +140,9 @@ export class JsonRpcProcessClient {
       message = JSON.parse(line) as IncomingMessage;
     } catch (error) {
       this.#rejectAll(
-        new ProtocolError(`Invalid JSON from Codex App Server: ${line}`, { cause: error }),
+        new ProtocolError(`Invalid JSON from Codex App Server: ${line}`, {
+          cause: error,
+        }),
       );
       return;
     }
@@ -146,7 +154,11 @@ export class JsonRpcProcessClient {
       }
       this.#pending.delete(message.id);
       if (isFailure(message)) {
-        deferred.reject(new ProtocolError(`App Server request failed: ${message.error.message}`));
+        deferred.reject(
+          new ProtocolError(
+            `App Server request failed: ${message.error.message}`,
+          ),
+        );
       } else {
         deferred.resolve(message.result);
       }

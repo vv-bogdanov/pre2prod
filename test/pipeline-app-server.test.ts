@@ -39,9 +39,15 @@ describe("Pre2prodPipeline with App Server transport", () => {
       networkAccess: false,
     });
 
-    expect(result.phases).toEqual([{ phase, iterations: 1, passed: true, findings: [] }]);
-    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toContain("# Plan");
-    expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe("fixed\n");
+    expect(result.phases).toEqual([
+      { phase, iterations: 1, passed: true, findings: [] },
+    ]);
+    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toContain(
+      "# Plan",
+    );
+    expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe(
+      "fixed\n",
+    );
   });
 
   it("forwards live App Server activity and errors to the reporter", async () => {

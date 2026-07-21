@@ -25,14 +25,15 @@ describe("ConsoleProgressReporter", () => {
       .spyOn(console, "log")
       .mockImplementation(() => undefined);
 
-    reporter.thinking(
-      '{"blockers":["x"],"non_blockers":["y"]}',
-      context,
-    );
+    reporter.thinking('{"blockers":["x"],"non_blockers":["y"]}', context);
 
-    const lines = consoleSpy.mock.calls.flatMap((call) => String(call[0]).split("\n"));
+    const lines = consoleSpy.mock.calls.flatMap((call) =>
+      String(call[0]).split("\n"),
+    );
     const joined = lines.join("\n");
-    expect(lines).toContain("      [reviewer/review foundation-immediate-risk-triage#1] think: {");
+    expect(lines).toContain(
+      "      [reviewer/review foundation-immediate-risk-triage#1] think: {",
+    );
     expect(joined).toContain('  "blockers": [');
     expect(joined).toContain('  "non_blockers": [');
     expect(joined).toContain('"y"');
@@ -52,4 +53,3 @@ describe("ConsoleProgressReporter", () => {
     expect(lines[1]).toContain("think: Line 2");
   });
 });
-

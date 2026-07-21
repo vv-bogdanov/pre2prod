@@ -70,7 +70,7 @@ You can still use the full YAML format with `include`, `phases`, and object-styl
 
 ## CLI
 
-```text
+````text
 pre2prod [instructions...]
 
 Options:
@@ -94,7 +94,7 @@ Use `--dev` to force rebuild explicitly (or `PRE2PROD_DEV=1` as legacy override)
 
 ```bash
 pre2prod -C . -o --max-iterations 1
-```
+````
 
 In a source checkout, `dev.env` configures the default development provider and model. It is loaded only for dev mode, so installed and normal runs keep Codex defaults. CLI flags override `dev.env`.
 

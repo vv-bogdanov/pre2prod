@@ -4,7 +4,10 @@ import type { Phase } from "./core/types.js";
 
 const PHASE_ALL_ALIASES = new Set(["all", "*", "__all__"]);
 
-export function collectPhaseIds(value: string, previous: string[] = []): string[] {
+export function collectPhaseIds(
+  value: string,
+  previous: string[] = [],
+): string[] {
   const parsed = parsePhaseIds(value);
   return [...previous, ...parsed];
 }
@@ -34,37 +37,56 @@ export function selectPhases(
       ? resolveSelectorsToPhaseIds(include, allPhases, phaseLookup)
       : null;
 
-  const includedIds =
-    includeResolution ? includeResolution.resolvedIds : availableIds;
+  const includedIds = includeResolution
+    ? includeResolution.resolvedIds
+    : availableIds;
   if (include.length > 0) {
-    validateKnownIds("--phases", availableIds, includeResolution?.unmatchedSelectors ?? []);
+    validateKnownIds(
+      "--phases",
+      availableIds,
+      includeResolution?.unmatchedSelectors ?? [],
+    );
   }
 
-  const selected = include.length === 0
-    ? [...allPhases]
-    : uniqueFromSource(includedIds).map((id) => {
-      const phase = availableById.get(id);
-      if (!phase) {
-        throw new Error("Unreachable: validation did not prevent missing phase");
-      }
-      return phase;
-    });
+  const selected =
+    include.length === 0
+      ? [...allPhases]
+      : uniqueFromSource(includedIds).map((id) => {
+          const phase = availableById.get(id);
+          if (!phase) {
+            throw new Error(
+              "Unreachable: validation did not prevent missing phase",
+            );
+          }
+          return phase;
+        });
 
-  const excludeResolution = exclude.length > 0
-    ? resolveSelectorsToPhaseIds(exclude, allPhases, phaseLookup)
-    : null;
+  const excludeResolution =
+    exclude.length > 0
+      ? resolveSelectorsToPhaseIds(exclude, allPhases, phaseLookup)
+      : null;
 
-  const resolvedExcludes = excludeResolution ? excludeResolution.resolvedIds : [];
+  const resolvedExcludes = excludeResolution
+    ? excludeResolution.resolvedIds
+    : [];
   if (exclude.length > 0) {
-    validateKnownIds("--exclude", availableIds, excludeResolution?.unmatchedSelectors ?? []);
+    validateKnownIds(
+      "--exclude",
+      availableIds,
+      excludeResolution?.unmatchedSelectors ?? [],
+    );
   }
 
-  const excludeSet = new Set(resolvedExcludes.map((id) => id.trim().toLowerCase()).filter(Boolean));
+  const excludeSet = new Set(
+    resolvedExcludes.map((id) => id.trim().toLowerCase()).filter(Boolean),
+  );
 
   const result = selected.filter((phase) => !excludeSet.has(phase.id));
 
   if (result.length === 0) {
-    throw new Pre2prodError("No phases remain after applying include/exclude filters.");
+    throw new Pre2prodError(
+      "No phases remain after applying include/exclude filters.",
+    );
   }
 
   return result;
@@ -81,7 +103,9 @@ export function formatPhaseList(
   const groups = new Map<string, { phase: Phase; displayTitle: string }[]>();
   for (const phase of phases) {
     const phaseId = phase.id;
-    const prefix = phaseId.includes("-") ? phaseId.split("-")[0] ?? "" : phaseId;
+    const prefix = phaseId.includes("-")
+      ? (phaseId.split("-")[0] ?? "")
+      : phaseId;
     const group = toGroupName(prefix);
     const displayTitle = stripGroupPrefix(phase.title, group);
     const list = groups.get(group) ?? [];
@@ -89,8 +113,13 @@ export function formatPhaseList(
   }
 
   const output: string[] = [];
-  const allDisplayTitles = [...groups.values()].flat().map((entry) => entry.displayTitle);
-  const maxTitleLength = Math.max(...allDisplayTitles.map((title) => title.length), 0);
+  const allDisplayTitles = [...groups.values()]
+    .flat()
+    .map((entry) => entry.displayTitle);
+  const maxTitleLength = Math.max(
+    ...allDisplayTitles.map((title) => title.length),
+    0,
+  );
 
   let isFirstGroup = true;
   for (const [group, values] of groups) {

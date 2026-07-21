@@ -34,14 +34,20 @@ export function hasId(
   return "id" in message;
 }
 
-export function isServerRequest(message: IncomingMessage): message is JsonRpcRequest {
+export function isServerRequest(
+  message: IncomingMessage,
+): message is JsonRpcRequest {
   return hasId(message) && "method" in message;
 }
 
-export function isResponse(message: IncomingMessage): message is JsonRpcSuccess | JsonRpcFailure {
+export function isResponse(
+  message: IncomingMessage,
+): message is JsonRpcSuccess | JsonRpcFailure {
   return hasId(message) && !("method" in message);
 }
 
-export function isFailure(message: JsonRpcSuccess | JsonRpcFailure): message is JsonRpcFailure {
+export function isFailure(
+  message: JsonRpcSuccess | JsonRpcFailure,
+): message is JsonRpcFailure {
   return "error" in message;
 }
