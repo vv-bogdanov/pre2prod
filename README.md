@@ -208,4 +208,4 @@ node dist/cli.js --list -C /path/to/project
 - deployment readiness is prepared, not automatically promoted to production;
 - the resulting repository still requires human review before production use.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PRE2PROD_SPEC_RU.md`](docs/PRE2PROD_SPEC_RU.md), and [`HANDOFF.md`](HANDOFF.md).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PREPROD_SPEC_RU.md`](docs/PREPROD_SPEC_RU.md), and [`HANDOFF.md`](HANDOFF.md).
