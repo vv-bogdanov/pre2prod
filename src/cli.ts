@@ -9,7 +9,7 @@ import { AppServerRuntime } from "./app-server/runtime.js";
 import { loadPhases } from "./phases.js";
 import { Pre2prodPipeline } from "./pipeline.js";
 import { ConsoleProgressReporter } from "./progress.js";
-import { createRunId, FileRunLogger } from "./logging.js";
+import { createRunId, FileRunLogger, redactSensitiveText } from "./logging.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import {
   collectPhaseIds,
@@ -82,6 +82,7 @@ program
       cwd,
       runId,
       logDir: options.logDir,
+      onWriteError: (message) => reporter.warning(message),
     });
     const additionalInstructions = instructions.join(" ").trim();
 
@@ -210,7 +211,7 @@ program
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        console.error(`Log file not found: ${logPath}`);
+        console.error(`Log file not found: ${redactSensitiveText(logPath)}`);
         process.exitCode = 1;
         return;
       }
@@ -281,7 +282,7 @@ async function readLogFile(
 
   for (const line of lines) {
     if (matchesLogFilter(line, filters)) {
-      result.push(line);
+      result.push(redactSensitiveText(line));
     }
   }
 

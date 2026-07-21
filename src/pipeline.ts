@@ -249,8 +249,6 @@ export class Pre2prodPipeline {
           {
             ...phaseContext,
             phaseIteration,
-            blockers: review.blockers,
-            nonBlockers: review.non_blockers,
             blockersCount: review.blockers.length,
             nonBlockersCount: review.non_blockers.length,
             turnId: reviewTurn.turnId,
@@ -304,7 +302,6 @@ export class Pre2prodPipeline {
         {
           ...phaseContext,
           phaseIteration,
-          blockers: review.blockers,
           blockersCount: review.blockers.length,
         },
         { summary: true },
@@ -317,7 +314,7 @@ export class Pre2prodPipeline {
           {
             ...phaseContext,
             phaseIteration,
-            blockers: review.blockers,
+            blockersCount: review.blockers.length,
             maxIterationsPerPhase: options.maxIterationsPerPhase,
           },
           { summary: true },
@@ -486,7 +483,7 @@ export class Pre2prodPipeline {
       "phase.review.unreachable_state",
       {
         ...phaseContext,
-        blockers: latestBlockers,
+        blockersCount: latestBlockers.length,
       },
       { summary: true },
     );

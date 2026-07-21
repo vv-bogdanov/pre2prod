@@ -42,6 +42,14 @@ input.on("line", (line) => {
     return;
   }
 
+  if (message.method === "stderr-private-key") {
+    process.stderr.write(
+      "-----BEGIN PRIVATE KEY-----\nprivate-key-body\n-----END PRIVATE KEY-----\n",
+    );
+    send({ id: message.id, result: {} });
+    return;
+  }
+
   if (message.method === "malformed-scalar") {
     sendRaw('"not a JSON-RPC message"');
     return;

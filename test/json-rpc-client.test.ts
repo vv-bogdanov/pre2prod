@@ -1,5 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Writable } from "node:stream";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -54,6 +55,29 @@ describe("JsonRpcProcessClient", () => {
       await expect(client.request("exit-pending")).rejects.toThrow(
         /exited unexpectedly \(code=17, signal=null\)/i,
       );
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("redacts multiline private keys from App Server stderr", async () => {
+    let output = "";
+    const stderr = new Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        output += chunk.toString("utf8");
+        callback();
+      },
+    });
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: [mockServer],
+      stderr,
+    });
+    await client.start();
+    try {
+      await client.request("stderr-private-key");
+      expect(output).toContain("[REDACTED]");
+      expect(output).not.toContain("private-key-body");
     } finally {
       await client.close();
     }

@@ -5,6 +5,7 @@ import {
 } from "node:readline";
 
 import { ProtocolError } from "../core/errors.js";
+import { redactSensitiveText } from "../logging.js";
 import {
   isFailure,
   parseIncomingMessage,
@@ -55,7 +56,24 @@ export class JsonRpcProcessClient {
     });
 
     this.#process = child;
-    child.stderr.pipe(this.#options.stderr ?? process.stderr);
+    const stderr = this.#options.stderr ?? process.stderr;
+    let stderrRemainder = "";
+    child.stderr.on("data", (chunk: Buffer | string) => {
+      stderrRemainder += chunk.toString("utf8");
+      if (hasUnterminatedPrivateKey(stderrRemainder)) {
+        return;
+      }
+      const lines = redactSensitiveText(stderrRemainder).split(/\r?\n/);
+      stderrRemainder = lines.pop() ?? "";
+      for (const line of lines) {
+        stderr.write(`${redactSensitiveText(line)}\n`);
+      }
+    });
+    child.stderr.once("end", () => {
+      if (stderrRemainder) {
+        stderr.write(redactSensitiveText(stderrRemainder));
+      }
+    });
 
     child.once("error", (error) => {
       this.#fail(
@@ -221,4 +239,9 @@ export class JsonRpcProcessClient {
       handler(error);
     }
   }
+}
+
+function hasUnterminatedPrivateKey(value: string): boolean {
+  const start = value.lastIndexOf("-----BEGIN ");
+  return start !== -1 && !value.slice(start).includes("-----END ");
 }

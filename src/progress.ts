@@ -1,6 +1,7 @@
 import pc from "picocolors";
 
 import type { Phase, PipelineResult, ProgressReporter } from "./core/types.js";
+import { redactSensitiveText } from "./logging.js";
 
 export class ConsoleProgressReporter implements ProgressReporter {
   readonly #verboseEnabled: boolean;
@@ -17,15 +18,17 @@ export class ConsoleProgressReporter implements ProgressReporter {
   }
 
   public info(message: string): void {
-    console.log(pc.dim(`      ${message}`));
+    console.log(pc.dim(`      ${redactSensitiveText(message)}`));
   }
 
   public warning(message: string): void {
-    console.warn(pc.yellow(`      WARNING · ${message}`));
+    console.warn(pc.yellow(`      WARNING · ${redactSensitiveText(message)}`));
   }
 
   public phaseStarted(index: number, total: number, phase: Phase): void {
-    console.log(pc.bold(`[${index}/${total}] ${phase.title}`));
+    console.log(
+      pc.bold(`[${index}/${total}] ${redactSensitiveText(phase.title)}`),
+    );
   }
 
   public reviewing(isRepeat: boolean): void {
@@ -39,12 +42,12 @@ export class ConsoleProgressReporter implements ProgressReporter {
       ),
     );
     for (const finding of findings) {
-      console.log(pc.dim(`        - ${finding}`));
+      console.log(pc.dim(`        - ${redactSensitiveText(finding)}`));
     }
   }
 
   public planning(planPath: string): void {
-    console.log(pc.dim(`      Planning → ${planPath}`));
+    console.log(pc.dim(`      Planning → ${redactSensitiveText(planPath)}`));
   }
 
   public working(): void {
@@ -62,9 +65,10 @@ export class ConsoleProgressReporter implements ProgressReporter {
     context?: Record<string, unknown>,
   ): void {
     const contextLabel = this.#formatContext(context);
+    const safeCommand = redactSensitiveText(command);
     console.log(
       pc.dim(
-        `      ${contextLabel} command [${status ?? "unknown"}] ${this.#verboseEnabled ? command : command.slice(0, 220)}`,
+        `      ${contextLabel} command [${status ?? "unknown"}] ${this.#verboseEnabled ? safeCommand : safeCommand.slice(0, 220)}`,
       ),
     );
   }
@@ -86,17 +90,19 @@ export class ConsoleProgressReporter implements ProgressReporter {
     }
     const contextLabel = this.#formatContext(context);
     for (const path of paths) {
-      console.log(pc.green(`      ${contextLabel} file: ${path}`));
+      console.log(
+        pc.green(`      ${contextLabel} file: ${redactSensitiveText(path)}`),
+      );
     }
   }
 
   public waiting(message: string): void {
-    console.log(pc.dim(`      ${message}`));
+    console.log(pc.dim(`      ${redactSensitiveText(message)}`));
   }
 
   public verbose(message: string): void {
     if (this.#verboseEnabled) {
-      process.stdout.write(pc.dim(message));
+      process.stdout.write(pc.dim(redactSensitiveText(message)));
     }
   }
 
@@ -106,7 +112,7 @@ export class ConsoleProgressReporter implements ProgressReporter {
       `Passed phases: ${result.phases.filter((phase) => phase.passed).length}/${result.phases.length}`,
     );
     if (result.gitBranch) {
-      console.log(`Branch: ${result.gitBranch}`);
+      console.log(`Branch: ${redactSensitiveText(result.gitBranch)}`);
     }
     console.log(
       "Review the resulting repository before production deployment.",
@@ -114,7 +120,9 @@ export class ConsoleProgressReporter implements ProgressReporter {
   }
 
   public failed(message: string): void {
-    console.error(pc.red(pc.bold(`Pre2prod failed: ${message}`)));
+    console.error(
+      pc.red(pc.bold(`Pre2prod failed: ${redactSensitiveText(message)}`)),
+    );
   }
 
   #formatContext(context?: Record<string, unknown>): string {
@@ -142,8 +150,9 @@ export class ConsoleProgressReporter implements ProgressReporter {
       return;
     }
     const contextLabel = this.#formatContext(context);
-    const prettyJson = tryPrettyJsonLines(message);
-    const lines = prettyJson ?? splitLines(message);
+    const safeMessage = redactSensitiveText(message);
+    const prettyJson = tryPrettyJsonLines(safeMessage);
+    const lines = prettyJson ?? splitLines(safeMessage);
     const prefix = `      ${contextLabel} ${label}:`;
     if (prettyJson) {
       console.log(pc.dim(prefix));

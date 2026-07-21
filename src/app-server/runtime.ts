@@ -333,7 +333,7 @@ export class AppServerRuntime implements AgentRuntime {
         this.#logger?.log("debug", "runtime.turn.reasoning_summary", {
           ...this.#collectorContext(collector),
           turnId,
-          deltaSnippet: delta.slice(0, 140),
+          deltaLength: delta.length,
         });
       }
       return;
@@ -345,7 +345,7 @@ export class AppServerRuntime implements AgentRuntime {
         this.#logger?.log("debug", "runtime.turn.delta", {
           ...this.#collectorContext(collector),
           turnId,
-          deltaSnippet: delta.slice(0, 140),
+          deltaLength: delta.length,
         });
       }
       return;

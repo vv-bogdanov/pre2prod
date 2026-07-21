@@ -53,4 +53,37 @@ describe("ConsoleProgressReporter", () => {
     expect(lines[0]).toContain("think: Line 1");
     expect(lines[1]).toContain("think: Line 2");
   });
+
+  it("redacts sensitive values from observed output", () => {
+    const reporter = new ConsoleProgressReporter(true, true);
+    const consoleSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
+
+    reporter.command(
+      'curl --header "Authorization: Bearer terminal-token"',
+      "completed",
+      context,
+    );
+    reporter.thinking(
+      '{"apiKey":"terminal-key","apiSecret":"terminal-secret","safe":"keep-me"}',
+      context,
+    );
+    reporter.result("token=terminal-result", context);
+    reporter.thinking(
+      "-----BEGIN PRIVATE KEY-----\nprivate-key-body\n-----END PRIVATE KEY-----",
+      context,
+    );
+
+    const output = consoleSpy.mock.calls
+      .map((call) => String(call[0]))
+      .join("\n");
+    expect(output).not.toContain("terminal-token");
+    expect(output).not.toContain("terminal-key");
+    expect(output).not.toContain("terminal-secret");
+    expect(output).not.toContain("terminal-result");
+    expect(output).not.toContain("private-key-body");
+    expect(output).toContain("[REDACTED]");
+    expect(output).toContain("keep-me");
+  });
 });

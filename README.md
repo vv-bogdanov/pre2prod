@@ -109,6 +109,13 @@ pre2prod --local-provider ollama -p foundation-immediate-risk-triage
 
 `pre2prod logs` reads run logs in `.pre2prod/logs` (or `--log-dir` override):
 
+Run logs are local JSONL diagnostics. Command text, warnings, errors, review
+findings, and observed model output are redacted before display or persistence;
+high-volume model deltas are represented by lengths only. Each full and summary
+log is bounded at 10 MiB by retaining complete recent JSONL records. If a log
+write fails, Pre2prod emits one warning and continues without persisted
+diagnostics, so the terminal result remains the source of truth for that run.
+
 ```text
 pre2prod logs [options]
 

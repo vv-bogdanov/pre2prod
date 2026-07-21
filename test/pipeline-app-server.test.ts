@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { AppServerRuntime } from "../src/app-server/runtime.js";
 import type { Phase, ProgressReporter } from "../src/core/types.js";
+import type { RunLogger } from "../src/logging.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -86,6 +87,10 @@ describe("Pre2prodPipeline with App Server transport", () => {
     const results: string[] = [];
     const commands: Array<{ command: string; status: string | undefined }> = [];
     const warnings: string[] = [];
+    const logEvents: Array<{
+      event: string;
+      details: Record<string, unknown> | undefined;
+    }> = [];
     const reporter = silentReporter();
     reporter.thinking = (message) => thinking.push(message);
     reporter.result = (message) => results.push(message);
@@ -96,6 +101,12 @@ describe("Pre2prodPipeline with App Server transport", () => {
       args: [mockServer],
       cwd,
       reporter,
+      logger: {
+        runId: "runtime-test",
+        log: (_level, event, details) => {
+          logEvents.push({ event, details });
+        },
+      } satisfies RunLogger,
     });
 
     try {
@@ -120,6 +131,19 @@ describe("Pre2prodPipeline with App Server transport", () => {
     expect(warnings).toContain(
       "App Server error (retrying): temporary mock error",
     );
+    expect(
+      logEvents.find((entry) => entry.event === "runtime.turn.delta")?.details,
+    ).toMatchObject({ deltaLength: "Repository ".length });
+    expect(
+      logEvents.find(
+        (entry) => entry.event === "runtime.turn.reasoning_summary",
+      )?.details,
+    ).toMatchObject({ deltaLength: "Inspecting the repository.".length });
+    expect(
+      logEvents.some((entry) =>
+        Object.hasOwn(entry.details ?? {}, "deltaSnippet"),
+      ),
+    ).toBe(false);
   });
 
   it("fails without a checkpoint when the App Server exits during review", async () => {
