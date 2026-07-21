@@ -1,5 +1,11 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdtemp,
+  readdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -78,6 +84,68 @@ describe("Pre2prodPipeline with App Server transport", () => {
       }
     },
   );
+
+  it("times out a turn with no terminal event and cleans up its collector", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-turn-timeout-"));
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      env: { ...process.env, MOCK_HANG_TURN: "1" },
+      turnTimeoutMs: 20,
+    });
+
+    try {
+      await runtime.initialize();
+      const thread = await runtime.startThread({ cwd });
+      await expect(
+        runtime.runTurn({
+          threadId: thread.id,
+          prompt: "hang turn",
+          cwd,
+          sandbox: "read-only",
+        }),
+      ).rejects.toThrow(/turn .* timed out after 20ms/i);
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it("rejects an active turn when runtime close is called repeatedly", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-runtime-close-"));
+    const turnStartedFile = resolve(cwd, "turn-started");
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      env: {
+        ...process.env,
+        MOCK_HANG_TURN: "1",
+        MOCK_TURN_STARTED_FILE: turnStartedFile,
+      },
+      turnTimeoutMs: 10_000,
+    });
+
+    try {
+      await runtime.initialize();
+      const thread = await runtime.startThread({ cwd });
+      const pending = runtime.runTurn({
+        threadId: thread.id,
+        prompt: "hang turn",
+        cwd,
+        sandbox: "read-only",
+      });
+      await waitForFile(turnStartedFile);
+      const firstClose = runtime.close();
+      const secondClose = runtime.close();
+
+      await expect(pending).rejects.toThrow(/runtime closed/i);
+      expect(secondClose).toBe(firstClose);
+      await Promise.all([firstClose, secondClose]);
+    } finally {
+      await runtime.close();
+    }
+  });
 
   it("completes worker execution when the goal finishes before turn completion", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-e2e-"));
@@ -261,6 +329,19 @@ function silentReporter(): ProgressReporter {
     completed() {},
     failed() {},
   };
+}
+
+async function waitForFile(path: string): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    try {
+      await access(path);
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  throw new Error(`Timed out waiting for ${path}`);
 }
 
 async function initBaseRepository(cwd: string): Promise<void> {

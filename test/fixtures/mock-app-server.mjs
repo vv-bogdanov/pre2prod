@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { access, writeFile } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const input = createInterface({ input: process.stdin });
@@ -9,6 +10,23 @@ let threadCounter = 0;
 let turnCounter = 0;
 const goals = new Map();
 const now = () => Math.floor(Date.now() / 1000);
+
+if (process.env.MOCK_PID_FILE) {
+  await writeFile(process.env.MOCK_PID_FILE, `${process.pid}\n`, "utf8");
+}
+if (process.env.MOCK_EXIT_FILE) {
+  const markExited = () => {
+    writeFileSync(process.env.MOCK_EXIT_FILE, `${process.pid}\n`, "utf8");
+  };
+  process.once("SIGINT", () => {
+    markExited();
+    process.exit(0);
+  });
+  process.once("SIGTERM", () => {
+    markExited();
+    process.exit(0);
+  });
+}
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -179,12 +197,23 @@ input.on("line", async (line) => {
       method: "turn/started",
       params: { turn: { id: turnId, status: "inProgress", items: [] } },
     });
+    if (process.env.MOCK_TURN_STARTED_FILE) {
+      await writeFile(process.env.MOCK_TURN_STARTED_FILE, "started\n", "utf8");
+    }
 
     if (
       process.env.MOCK_EXIT_DURING_REVIEW === "1" &&
       prompt.includes("Current phase")
     ) {
       setTimeout(() => process.exit(17), 10);
+      return;
+    }
+
+    if (
+      process.env.MOCK_HANG_TURN === "1" &&
+      (prompt.includes("First, study the repository") ||
+        prompt.includes("hang turn"))
+    ) {
       return;
     }
 

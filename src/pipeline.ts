@@ -1,7 +1,5 @@
 import { access, mkdir, readFile, rename, rm } from "node:fs/promises";
-import { execFile } from "node:child_process";
 import { resolve } from "node:path";
-import { promisify } from "node:util";
 
 import type {
   AgentRuntime,
@@ -14,7 +12,7 @@ import type {
   ProgressReporter,
 } from "./core/types.js";
 import { PhaseFailedError, Pre2prodError } from "./core/errors.js";
-import { prepareGit } from "./git.js";
+import { prepareGit, workingTreeStatus } from "./git.js";
 import { loadPhases } from "./phases.js";
 import {
   initialDiscoveryPrompt,
@@ -27,7 +25,6 @@ import { parseReviewResult, REVIEW_RESULT_SCHEMA } from "./reviewer.js";
 
 const PLAN_FILE = "PRE2PROD_PLAN.md";
 const TURN_WAIT_HEARTBEAT_MS = 10_000;
-const execFileAsync = promisify(execFile);
 
 export class Pre2prodPipeline {
   readonly #runtime: AgentRuntime;
@@ -554,12 +551,7 @@ export class Pre2prodPipeline {
 }
 
 async function assertOnlyPlanChanged(cwd: string): Promise<void> {
-  const result = await execFileAsync(
-    "git",
-    ["status", "--porcelain", "--untracked-files=all"],
-    { cwd, encoding: "utf8" },
-  );
-  const changedPaths = result.stdout
+  const changedPaths = (await workingTreeStatus(cwd))
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => line.slice(3));

@@ -17,6 +17,7 @@ import {
 interface Deferred<T> {
   resolve(value: T): void;
   reject(reason: unknown): void;
+  timer: NodeJS.Timeout;
 }
 
 export interface JsonRpcClientOptions {
@@ -25,10 +26,13 @@ export interface JsonRpcClientOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   stderr?: NodeJS.WritableStream;
+  requestTimeoutMs?: number;
 }
 
 export type NotificationHandler = (method: string, params: unknown) => void;
 type FailureHandler = (error: Error) => void;
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 export class JsonRpcProcessClient {
   readonly #options: JsonRpcClientOptions;
@@ -39,12 +43,21 @@ export class JsonRpcProcessClient {
   #process?: ChildProcessWithoutNullStreams;
   #lines?: ReadlineInterface;
   #closed = false;
+  #closePromise?: Promise<void>;
+  readonly #requestTimeoutMs: number;
 
   public constructor(options: JsonRpcClientOptions) {
     this.#options = options;
+    this.#requestTimeoutMs =
+      options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   }
 
   public start(): Promise<void> {
+    if (this.#closed) {
+      return Promise.reject(
+        new ProtocolError("Codex App Server client is closed"),
+      );
+    }
     if (this.#process) {
       return Promise.resolve();
     }
@@ -112,10 +125,33 @@ export class JsonRpcProcessClient {
   public async request<T>(method: string, params?: unknown): Promise<T> {
     const id = this.#nextId++;
     const promise = new Promise<unknown>((resolve, reject) => {
-      this.#pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        const deferred = this.#pending.get(id);
+        if (!deferred) {
+          return;
+        }
+        this.#pending.delete(id);
+        clearTimeout(deferred.timer);
+        deferred.reject(
+          new ProtocolError(
+            `App Server request "${method}" timed out after ${this.#requestTimeoutMs}ms`,
+          ),
+        );
+      }, this.#requestTimeoutMs);
+      timer.unref();
+      this.#pending.set(id, { resolve, reject, timer });
     });
 
-    this.#send({ id, method, ...(params === undefined ? {} : { params }) });
+    try {
+      this.#send({ id, method, ...(params === undefined ? {} : { params }) });
+    } catch (error) {
+      const deferred = this.#pending.get(id);
+      if (deferred) {
+        this.#pending.delete(id);
+        clearTimeout(deferred.timer);
+        deferred.reject(error);
+      }
+    }
     return (await promise) as T;
   }
 
@@ -127,8 +163,18 @@ export class JsonRpcProcessClient {
     this.#send({ id, result });
   }
 
-  public async close(): Promise<void> {
+  public close(): Promise<void> {
+    if (this.#closePromise) {
+      return this.#closePromise;
+    }
+
+    this.#closePromise = this.#close();
+    return this.#closePromise;
+  }
+
+  async #close(): Promise<void> {
     this.#closed = true;
+    this.#rejectAll(new ProtocolError("Codex App Server client closed"));
     this.#lines?.close();
     this.#process?.stdin.end();
 
@@ -186,6 +232,7 @@ export class JsonRpcProcessClient {
         return;
       }
       this.#pending.delete(message.id);
+      clearTimeout(deferred.timer);
       if (isFailure(message)) {
         deferred.reject(
           new ProtocolError(
@@ -228,6 +275,7 @@ export class JsonRpcProcessClient {
 
   #rejectAll(error: Error): void {
     for (const deferred of this.#pending.values()) {
+      clearTimeout(deferred.timer);
       deferred.reject(error);
     }
     this.#pending.clear();

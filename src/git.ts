@@ -5,6 +5,7 @@ import { Pre2prodError } from "./core/errors.js";
 import type { ProgressReporter } from "./core/types.js";
 
 const execFileAsync = promisify(execFile);
+const GIT_COMMAND_TIMEOUT_MS = 30_000;
 
 export interface GitSession {
   enabled: true;
@@ -29,8 +30,8 @@ export async function prepareGit(
 ${GIT_COMMAND_HINT}`);
   }
 
-  const status = await git(cwd, ["status", "--porcelain"]);
-  if (status.stdout.trim()) {
+  const status = await workingTreeStatus(cwd);
+  if (status.trim()) {
     throw new Pre2prodError(
       "Git working tree is not clean. Commit or stash local changes before running pre2prod.",
     );
@@ -117,7 +118,12 @@ async function git(
   allowNonZero = false,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   try {
-    const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
+    const result = await execFileAsync("git", args, {
+      cwd,
+      encoding: "utf8",
+      timeout: GIT_COMMAND_TIMEOUT_MS,
+      killSignal: "SIGTERM",
+    });
     return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
   } catch (error) {
     const record = error as {
@@ -138,6 +144,15 @@ async function git(
     }
     throw error;
   }
+}
+
+export async function workingTreeStatus(cwd: string): Promise<string> {
+  const result = await git(cwd, [
+    "status",
+    "--porcelain",
+    "--untracked-files=all",
+  ]);
+  return result.stdout;
 }
 
 function formatRunId(date: Date): string {

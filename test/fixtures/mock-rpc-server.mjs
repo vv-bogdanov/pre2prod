@@ -2,6 +2,7 @@
 import { createInterface } from "node:readline";
 
 const input = createInterface({ input: process.stdin });
+setInterval(() => {}, 1_000);
 let pendingTrigger;
 
 function send(message) {
@@ -39,6 +40,10 @@ input.on("line", (line) => {
 
   if (message.method === "exit-pending") {
     setTimeout(() => process.exit(17), 10);
+    return;
+  }
+
+  if (message.method === "no-response") {
     return;
   }
 

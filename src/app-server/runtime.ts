@@ -48,6 +48,7 @@ interface TurnCollector {
   usage: Record<string, unknown> | undefined;
   threadId: string;
   logContext: TurnLogContext | undefined;
+  timer: NodeJS.Timeout;
   resolve(result: TurnResult): void;
   reject(reason: unknown): void;
 }
@@ -58,7 +59,10 @@ export interface AppServerRuntimeOptions extends JsonRpcClientOptions {
   modelProvider?: string;
   clientVersion?: string;
   logger?: RunLogger;
+  turnTimeoutMs?: number;
 }
+
+const DEFAULT_TURN_TIMEOUT_MS = 30 * 60_000;
 
 export class AppServerRuntime implements AgentRuntime {
   readonly #client: JsonRpcProcessClient;
@@ -67,6 +71,7 @@ export class AppServerRuntime implements AgentRuntime {
   readonly #modelProvider: string | undefined;
   readonly #clientVersion: string;
   readonly #logger: RunLogger | undefined;
+  readonly #turnTimeoutMs: number;
   readonly #collectors = new Map<string, TurnCollector>();
   readonly #settledTurnIds = new Set<string>();
   readonly #earlyEvents = new Map<
@@ -76,6 +81,7 @@ export class AppServerRuntime implements AgentRuntime {
   #initialized = false;
   #unsubscribe: (() => void) | undefined;
   #unsubscribeFailure: (() => void) | undefined;
+  #closePromise?: Promise<void>;
 
   public constructor(options: AppServerRuntimeOptions) {
     this.#reporter = options.reporter;
@@ -83,6 +89,7 @@ export class AppServerRuntime implements AgentRuntime {
     this.#modelProvider = options.modelProvider;
     this.#clientVersion = options.clientVersion ?? "0.1.0";
     this.#logger = options.logger;
+    this.#turnTimeoutMs = options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS;
     this.#client = new JsonRpcProcessClient(options);
     this.#unsubscribeFailure = this.#client.onFailure((error) =>
       this.#failActiveTurns(error),
@@ -210,6 +217,10 @@ export class AppServerRuntime implements AgentRuntime {
 
     const turnId = response.turn.id;
     const result = new Promise<TurnResult>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.#timeoutTurn(turnId);
+      }, this.#turnTimeoutMs);
+      timer.unref();
       this.#collectors.set(turnId, {
         turnId,
         text: "",
@@ -217,6 +228,7 @@ export class AppServerRuntime implements AgentRuntime {
         usage: undefined,
         threadId: request.threadId,
         logContext,
+        timer,
         resolve,
         reject,
       });
@@ -277,8 +289,18 @@ export class AppServerRuntime implements AgentRuntime {
     return response.cleared;
   }
 
-  public async close(): Promise<void> {
+  public close(): Promise<void> {
+    if (this.#closePromise) {
+      return this.#closePromise;
+    }
+
+    this.#closePromise = this.#close();
+    return this.#closePromise;
+  }
+
+  async #close(): Promise<void> {
     this.#logger?.log("debug", "runtime.close.start");
+    this.#failActiveTurns(new TurnFailedError("App Server runtime closed"));
     this.#unsubscribe?.();
     this.#unsubscribeFailure?.();
     await this.#client.close();
@@ -568,8 +590,28 @@ export class AppServerRuntime implements AgentRuntime {
   }
 
   #discardCollector(collector: TurnCollector): void {
+    clearTimeout(collector.timer);
     this.#settledTurnIds.add(collector.turnId);
     this.#collectors.delete(collector.turnId);
+  }
+
+  #timeoutTurn(turnId: string): void {
+    const collector = this.#collectors.get(turnId);
+    if (!collector) {
+      return;
+    }
+
+    const error = new TurnFailedError(
+      `App Server turn ${turnId} timed out after ${this.#turnTimeoutMs}ms`,
+    );
+    this.#reporter?.warning(error.message);
+    this.#logger?.log("error", "runtime.turn.timeout", {
+      ...this.#collectorContext(collector),
+      turnId,
+      timeoutMs: this.#turnTimeoutMs,
+    });
+    this.#discardCollector(collector);
+    collector.reject(error);
   }
 
   #failActiveTurns(error: Error): void {

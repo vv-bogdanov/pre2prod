@@ -14,7 +14,11 @@ a consolidated report and recommendations for the CLI's MVP scope.
 - Keep `main` clean; use `dogfood/pre2prod-sota` as the reviewed integration
   branch.
 - Start each wave without `--no-commit`; Pre2prod creates its own
-  `pre2prod/<timestamp>` wave branch and commits every passed phase.
+  `pre2prod/<timestamp>` wave branch and commits every passed phase. Use
+  `--max-iterations 1` unless a rule below overrides it.
+- Run the remaining Operations phases and all Assurance and Delivery phases
+  with `--model gpt-5.3-codex-spark --max-iterations 2` to close a second
+  confirmed remediation cycle without a manual rerun.
 - Run only selected, unfinished phases in a logical group per wave. The
   persistent Reviewer performs discovery once and stays alive across that wave.
 - Do not start a later wave until the current wave's commits, logs, reports,
@@ -45,8 +49,8 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 ## Wave Procedure
 
-- [ ] Start a wave from the clean dogfood branch with its selected phase group
-      and `--max-iterations 1`, without `--no-commit`.
+- [ ] Start a wave from the clean dogfood branch with its selected phase group,
+      the configured model and iteration limit, and without `--no-commit`.
 - [ ] Record the wave branch, run ID, model/provider, selected phases, and
       result.
 - [ ] If it passes, inspect each checkpoint commit, `git diff` from the wave

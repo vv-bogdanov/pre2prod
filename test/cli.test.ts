@@ -1,5 +1,6 @@
-import { execFile, spawn } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import {
+  access,
   mkdir,
   mkdtemp,
   open,
@@ -141,6 +142,76 @@ describe("pre2prod CLI", () => {
       await rm(repository, { recursive: true, force: true });
     }
   });
+
+  it("shuts down the App Server child on SIGTERM", async () => {
+    const repository = await mkdtemp(resolve(tmpdir(), "pre2prod-cli-signal-"));
+    const pidFile = resolve(repository, "mock.pid");
+    const exitFile = resolve(repository, "mock.exit");
+    let child: ChildProcess | undefined;
+
+    try {
+      await initBaseRepository(repository);
+      await mkdir(resolve(repository, ".pre2prod"), { recursive: true });
+      await writeFile(
+        resolve(repository, ".pre2prod", "phases.yaml"),
+        [
+          "phases:",
+          "  - id: mock-readiness",
+          "    title: Mock readiness",
+          "    reviewerPrompt: Require mock-fixed.txt to exist.",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
+
+      const spawnedChild = spawn(
+        process.execPath,
+        [
+          cliPath,
+          "--cwd",
+          repository,
+          "--codex-bin",
+          mockCodex,
+          "--max-iterations",
+          "1",
+          "--no-network",
+        ],
+        {
+          cwd,
+          env: {
+            ...process.env,
+            MOCK_HANG_TURN: "1",
+            MOCK_PID_FILE: pidFile,
+            MOCK_EXIT_FILE: exitFile,
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
+      child = spawnedChild;
+      const stderr: string[] = [];
+      spawnedChild.stderr.on("data", (chunk: Buffer) =>
+        stderr.push(chunk.toString("utf8")),
+      );
+
+      await waitForFile(pidFile);
+      spawnedChild.kill("SIGTERM");
+      const exitCode = await new Promise<number>((resolveExit, reject) => {
+        spawnedChild.once("error", reject);
+        spawnedChild.once("close", (code) => resolveExit(code ?? 1));
+      });
+      await waitForFile(exitFile);
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr.join("")).toContain(
+        "Received SIGTERM; shutting down App Server...",
+      );
+    } finally {
+      if (child && child.exitCode === null) {
+        child.kill("SIGKILL");
+      }
+      await rm(repository, { recursive: true, force: true });
+    }
+  });
 });
 
 async function runCli(...args: string[]): Promise<CliResult> {
@@ -215,4 +286,17 @@ async function initBaseRepository(cwd: string): Promise<void> {
 async function execGit(cwd: string, args: string[]): Promise<string> {
   const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
   return result.stdout;
+}
+
+async function waitForFile(path: string): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    try {
+      await access(path);
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  throw new Error(`Timed out waiting for ${path}`);
 }

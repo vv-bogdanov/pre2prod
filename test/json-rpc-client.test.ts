@@ -8,6 +8,11 @@ import { JsonRpcProcessClient } from "../src/app-server/json-rpc-client.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const mockServer = resolve(here, "fixtures/mock-rpc-server.mjs");
+const delayedResponseScript = [
+  "const send = (message) => process.stdout.write(JSON.stringify(message) + '\\n');",
+  "setTimeout(() => send({ id: 1, result: { delayed: true } }), 200);",
+  "setInterval(() => {}, 1000);",
+].join("\n");
 
 describe("JsonRpcProcessClient", () => {
   it("routes notifications and declines unexpected approvals", async () => {
@@ -58,6 +63,41 @@ describe("JsonRpcProcessClient", () => {
     } finally {
       await client.close();
     }
+  });
+
+  it("times out a request and ignores its late response", async () => {
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: ["-e", delayedResponseScript],
+      requestTimeoutMs: 50,
+    });
+    const failures: Error[] = [];
+    client.onFailure((error) => failures.push(error));
+    await client.start();
+    try {
+      await expect(client.request("delayed-response")).rejects.toThrow(
+        /request "delayed-response" timed out after 50ms/i,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(failures).toHaveLength(0);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("rejects pending requests and makes close idempotent", async () => {
+    const client = new JsonRpcProcessClient({
+      command: process.execPath,
+      args: [mockServer],
+    });
+    await client.start();
+    const pending = client.request("no-response");
+    const firstClose = client.close();
+    const secondClose = client.close();
+
+    await expect(pending).rejects.toThrow(/client closed/i);
+    expect(secondClose).toBe(firstClose);
+    await Promise.all([firstClose, secondClose]);
   });
 
   it("redacts multiline private keys from App Server stderr", async () => {

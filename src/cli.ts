@@ -146,16 +146,33 @@ program
         logger,
       );
 
-      await pipeline.run({
-        cwd,
-        ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
-        ...(additionalInstructions
-          ? { instructions: additionalInstructions }
-          : {}),
-        maxIterationsPerPhase: options.maxIterations,
-        networkAccess: options.network,
-        commit: options.commit,
-      });
+      const shutdown = (signal: NodeJS.Signals): void => {
+        reporter.warning(`Received ${signal}; shutting down App Server...`);
+        void runtime.close().catch((error: unknown) => {
+          reporter.warning(
+            `App Server shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      };
+      const onInterrupt = (): void => shutdown("SIGINT");
+      const onTerminate = (): void => shutdown("SIGTERM");
+      process.once("SIGINT", onInterrupt);
+      process.once("SIGTERM", onTerminate);
+      try {
+        await pipeline.run({
+          cwd,
+          ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
+          ...(additionalInstructions
+            ? { instructions: additionalInstructions }
+            : {}),
+          maxIterationsPerPhase: options.maxIterations,
+          networkAccess: options.network,
+          commit: options.commit,
+        });
+      } finally {
+        process.off("SIGINT", onInterrupt);
+        process.off("SIGTERM", onTerminate);
+      }
     } catch (error) {
       reporter.failed(
         `${error instanceof Error ? error.message : String(error)}; logs: ${logger.runId}`,
