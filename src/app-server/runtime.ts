@@ -103,6 +103,7 @@ export class AppServerRuntime implements AgentRuntime {
         title: "Pre2Prod",
         version: this.#clientVersion,
       },
+      capabilities: null,
     });
     this.#client.notify("initialized", {});
     this.#logger?.log("debug", "runtime.initialize.complete");
@@ -177,11 +178,13 @@ export class AppServerRuntime implements AgentRuntime {
         approvalPolicy: "never",
         sandboxPolicy:
           request.sandbox === "read-only"
-            ? { type: "readOnly" }
+            ? { type: "readOnly", networkAccess: false }
             : {
                 type: "workspaceWrite",
                 writableRoots: [request.cwd],
                 networkAccess: request.networkAccess ?? true,
+                excludeTmpdirEnvVar: true,
+                excludeSlashTmp: true,
               },
         model: this.#model,
         ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),

@@ -20,6 +20,13 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "initialize") {
+    if (message.params?.capabilities !== null) {
+      send({
+        id: message.id,
+        error: { code: -32602, message: "Missing initialize capabilities" },
+      });
+      return;
+    }
     send({ id: message.id, result: { userAgent: "mock" } });
     return;
   }
@@ -116,6 +123,23 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "turn/start") {
+    const sandboxPolicy = message.params?.sandboxPolicy;
+    const isReadOnlySandbox =
+      sandboxPolicy?.type === "readOnly" &&
+      typeof sandboxPolicy.networkAccess === "boolean";
+    const isWorkspaceWriteSandbox =
+      sandboxPolicy?.type === "workspaceWrite" &&
+      Array.isArray(sandboxPolicy.writableRoots) &&
+      typeof sandboxPolicy.networkAccess === "boolean" &&
+      typeof sandboxPolicy.excludeTmpdirEnvVar === "boolean" &&
+      typeof sandboxPolicy.excludeSlashTmp === "boolean";
+    if (!isReadOnlySandbox && !isWorkspaceWriteSandbox) {
+      send({
+        id: message.id,
+        error: { code: -32602, message: "Invalid sandbox policy" },
+      });
+      return;
+    }
     const turnId = `turn-${++turnCounter}`;
     const prompt = message.params.input?.[0]?.text ?? "";
     const cwd = message.params.cwd ?? process.cwd();

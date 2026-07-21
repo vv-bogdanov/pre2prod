@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -42,12 +42,42 @@ describe("Pre2prodPipeline with App Server transport", () => {
     expect(result.phases).toEqual([
       { phase, iterations: 1, passed: true, findings: [] },
     ]);
-    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toContain(
-      "# Plan",
-    );
+    await expect(
+      readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8"),
+    ).rejects.toThrow();
+    const archivedPlans = await readdir(resolve(cwd, ".pre2prod", "plans"));
+    expect(archivedPlans).toHaveLength(1);
+    const [archivedPlan] = archivedPlans;
+    if (!archivedPlan) {
+      throw new Error("Expected archived Worker plan");
+    }
+    expect(
+      await readFile(resolve(cwd, ".pre2prod", "plans", archivedPlan), "utf8"),
+    ).toContain("# Plan");
     expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe(
       "fixed\n",
     );
+    expect(await execGit(cwd, ["status", "--porcelain"])).toBe("");
+
+    const secondRuntime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      model: "mock-model",
+    });
+    const secondPipeline = new Pre2prodPipeline(
+      secondRuntime,
+      silentReporter(),
+      [phase],
+    );
+    await expect(
+      secondPipeline.run({
+        cwd,
+        model: "mock-model",
+        maxIterationsPerPhase: 2,
+        networkAccess: false,
+      }),
+    ).resolves.toMatchObject({ phases: [{ passed: true }] });
   });
 
   it("forwards live App Server activity and errors to the reporter", async () => {
@@ -114,7 +144,8 @@ describe("Pre2prodPipeline with App Server transport", () => {
 async function initBaseRepository(cwd: string): Promise<void> {
   await execGit(cwd, ["init"]);
   await writeFile(resolve(cwd, "base.txt"), "base\n", "utf8");
-  await execGit(cwd, ["add", "base.txt"]);
+  await writeFile(resolve(cwd, ".gitignore"), ".pre2prod/\n", "utf8");
+  await execGit(cwd, ["add", "base.txt", ".gitignore"]);
   await execGit(cwd, [
     "-c",
     "user.name=Test",

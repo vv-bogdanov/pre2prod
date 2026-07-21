@@ -141,11 +141,7 @@ async function git(
 }
 
 function formatRunId(date: Date): string {
-  return date
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d{3}Z$/, "Z")
-    .toLowerCase();
+  return date.toISOString().replace(/[-:]/g, "").toLowerCase();
 }
 
 function messageOf(error: unknown): string {

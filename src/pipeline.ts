@@ -1,4 +1,4 @@
-import { access, readFile, rm } from "node:fs/promises";
+import { access, mkdir, readFile, rename, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import type {
@@ -269,6 +269,7 @@ export class Pre2prodPipeline {
       }
 
       if (review.blockers.length === 0) {
+        await archivePlan(options.cwd, runId, phase, phaseIteration);
         this.#reporter.phasePassed();
         this.#logger.log(
           "info",
@@ -565,4 +566,28 @@ async function assertPlanExists(cwd: string): Promise<void> {
       cause: error,
     });
   }
+}
+
+async function archivePlan(
+  cwd: string,
+  runId: string,
+  phase: Phase,
+  phaseIteration: number,
+): Promise<void> {
+  const planPath = resolve(cwd, PLAN_FILE);
+  try {
+    await access(planPath);
+  } catch {
+    return;
+  }
+
+  const directory = resolve(cwd, ".pre2prod", "plans");
+  const filename = `${fileSegment(runId)}-${fileSegment(phase.id)}-${phaseIteration}.md`;
+
+  await mkdir(directory, { recursive: true });
+  await rename(planPath, resolve(directory, filename));
+}
+
+function fileSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }

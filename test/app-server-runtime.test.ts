@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -44,9 +44,13 @@ describe("Pre2prodPipeline with App Server transport", () => {
     expect(result.phases).toEqual([
       { phase, iterations: 1, passed: true, findings: [] },
     ]);
-    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toContain(
-      "# Plan",
-    );
+    const [archivedPlan] = await readdir(resolve(cwd, ".pre2prod", "plans"));
+    if (!archivedPlan) {
+      throw new Error("Expected archived Worker plan");
+    }
+    expect(
+      await readFile(resolve(cwd, ".pre2prod", "plans", archivedPlan), "utf8"),
+    ).toContain("# Plan");
     expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe(
       "fixed\n",
     );
