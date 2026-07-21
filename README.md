@@ -59,73 +59,58 @@ npx --yes pre2prod \
 
 ## Built-in review phases
 
-### Foundation
-
-- Immediate Risk Triage
-- Reproducible Local Run
-- Core Scope & Critical Journeys
-- Critical Smoke Baseline
-
-### Architecture
-
-- System Shape & Dependency Boundaries
-- Data Model & Persistence
-- Dead Code & Dependency Cleanup
-- Simplification & Deduplication
-
-### Correctness
-
-- Type Safety
-- Runtime Contracts
-- Error Handling
-- Failure Diagnostics
-- Data Integrity & Migrations
-- Consolidation & Cleanup
-
-### Product
-
-- UX Completeness
-- Accessibility
-- Interaction & UI Cleanup
-
-### Verification
-
-- Core Unit & Invariants
-- Integration
-- Contracts & Compatibility
-- End-to-End Critical Journeys
-- Test Suite Cleanup & Stability
-- Static Analysis & Formatting
-
-### Operations
-
-- Observability
-- Reliability & Operability
-- Performance & Resource Efficiency
-- Instrumentation & Runtime Cleanup
-
-### Assurance
-
-- Application Security Hardening
-- Privacy & Sensitive Data
-- Legal & Compliance Readiness
-
-### Cleanup
-
-- Dead Code & Unused Surface
-- Dependencies, Scripts & Configuration
-- Duplication & Consolidation
-- Temporary, Legacy & Debug Artifacts
-- Owned Code Reduction
-
-### Delivery
-
-- CI Quality Gates
-- Release Artifact Integrity
-- Secure Supply Chain
-- Deployment Readiness
-- Staging Verification
-- Documentation & Repository
+```text
+Foundation
+  Immediate Risk Triage
+  Reproducible Local Run
+  Core Scope & Critical Journeys
+  Critical Smoke Baseline
+Architecture
+  System Shape & Dependency Boundaries
+  Data Model & Persistence
+  Dead Code & Dependency Cleanup
+  Simplification & Deduplication
+Correctness
+  Type Safety
+  Runtime Contracts
+  Error Handling
+  Failure Diagnostics
+  Data Integrity & Migrations
+  Consolidation & Cleanup
+Product
+  UX Completeness
+  Accessibility
+  Interaction & UI Cleanup
+Verification
+  Core Unit & Invariants
+  Integration
+  Contracts & Compatibility
+  End-to-End Critical Journeys
+  Test Suite Cleanup & Stability
+  Static Analysis & Formatting
+Operations
+  Observability
+  Reliability & Operability
+  Performance & Resource Efficiency
+  Instrumentation & Runtime Cleanup
+Assurance
+  Application Security Hardening
+  Privacy & Sensitive Data
+  Legal & Compliance Readiness
+Cleanup
+  Dead Code & Unused Surface
+  Dependencies, Scripts & Configuration
+  Duplication & Consolidation
+  Temporary, Legacy & Debug Artifacts
+  Owned Code Reduction
+Delivery
+  CI Quality Gates
+  Release Artifact Integrity
+  Secure Supply Chain
+  Deployment Readiness
+  Staging Verification
+  Documentation & Repository
+```
 
 ## Review Phases Configuration
 
