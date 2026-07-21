@@ -26,19 +26,20 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test",
+    "check": "pnpm run format:check && pnpm run typecheck && pnpm run lint && pnpm run test",
     "typecheck": "tsc --noEmit",
+    "link": "pnpm install && pnpm run build && pnpm link --global",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "pack:check": "npm pack --dry-run",
+    "pack:check": "pnpm pack --dry-run",
     "clean": "node scripts/clean.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "validate": "npm run format:check && npm run typecheck && npm run lint && npm run test:coverage && npm run build",
+    "validate": "pnpm run format:check && pnpm run typecheck && pnpm run lint && pnpm run test:coverage && pnpm run build",
     "codex:schemas": "codex app-server generate-ts --out generated/codex",
-    "prepack": "npm run validate"
+    "prepack": "pnpm run validate"
   },
   "keywords": [
     "codex",

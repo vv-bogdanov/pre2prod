@@ -28,8 +28,8 @@ This is a hackathon MVP scaffold. The orchestration, App Server client, prompts,
 ## Install and run
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm run build
 node dist/cli.js
 ```
 
@@ -103,15 +103,15 @@ pre2prod --list -p testing,security -x security
 ## Development
 
 ```bash
-npm run validate
-npm run pack:check
+pnpm run validate
+pnpm run pack:check
 ```
 
 Current automated baseline:
 
 - 13 tests across unit, Git, JSON-RPC, runtime, and full mock-pipeline coverage;
 - approximately 81% line coverage on the tested core;
-- successful TypeScript build and npm package dry run.
+- successful TypeScript build and pnpm package dry run.
 
 Tests include:
 
@@ -141,8 +141,7 @@ The skill only launches the CLI; it does not duplicate the workflow.
 From the checked-out pre2prod repository:
 
 ```bash
-npm run build
-npm link
+pnpm run link
 ```
 
 Now you can run directly from any repository:
