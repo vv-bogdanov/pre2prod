@@ -38,14 +38,14 @@
 
 "Architecture: Dead Code & Dependency Cleanup": |
   Review for code, configuration, endpoints, flags, and dependencies that no
-  longer support the chosen product and architecture. Remove only items that are
-  confidently unused or obsolete.
+  longer support the chosen product and architecture. Use suitable static analysis
+  where useful, but verify dynamic usage before removing anything.
 
 "Architecture: Simplification & Deduplication": |
   Review the remaining design for avoidable complexity and duplication. Check
   repeated domain rules, parallel implementations, unnecessary abstractions,
-  oversized flows, and inconsistent patterns. Simplify without changing intended
-  behavior.
+  oversized flows, and inconsistent patterns. Use duplicate detection where useful
+  and simplify only material issues without changing intended behavior.
 
 # Wave 3: Correctness
 "Correctness: Type Safety": |
@@ -76,10 +76,16 @@
   partial failures, and backup or restore expectations. Pass when the project has
   no persistent data.
 
+"Correctness: Consolidation & Cleanup": |
+  Review artifacts left by correctness work: parallel types, validators, error
+  mappings, compatibility wrappers, migrations, and obsolete code paths. Consolidate
+  overlapping mechanisms and remove only confidently superseded code before deeper
+  verification is added.
+
 # Wave 4: Product
 "Product: UX Completeness": |
   Review completion of critical user-facing states and journeys. Check loading,
-  empty, erChangesror, success, validation feedback, destructive confirmations, recovery,
+  empty, error, success, validation feedback, destructive confirmations, recovery,
   responsiveness, and equivalent CLI behavior where relevant. Do not add
   nonessential features.
 
@@ -88,6 +94,11 @@
   and focus behavior, semantics and labels, contrast, error communication,
   motion or timing, and basic screen-reader support. Adapt or pass for non-UI
   projects.
+
+"Product: Interaction & UI Cleanup": |
+  Review obsolete components, states, styles, routes, copy, feature flags, and
+  duplicate interaction logic left by product work. Remove only confidently unused
+  artifacts and consolidate repeated behavior without redesigning the product.
 
 # Wave 5: Verification
 "Verification: Core Unit & Invariants": |
@@ -111,10 +122,11 @@
   startup, the core value flow, auth or permissions, financial or destructive
   actions, and recovery where relevant. Avoid exhaustive UI permutations.
 
-"Verification: Test Suite Quality & Stability": |
-  Review whether the test suite is trustworthy and fast enough to support change.
-  Check flakiness, order dependence, shared state, weak assertions, excessive
-  mocks, skipped or focused tests, slowness, and unstable selectors.
+"Verification: Test Suite Cleanup & Stability": |
+  Review whether the test suite is trustworthy, maintainable, and fast enough to
+  support change. Remove duplicate or obsolete tests, fixtures, snapshots, and
+  mocks; check flakiness, order dependence, weak assertions, skipped tests,
+  slowness, and unstable selectors.
 
 "Verification: Static Analysis & Formatting": |
   Review lightweight automated formatting and static checks for the now-stable
@@ -140,6 +152,11 @@
   CPU, query count, bundle or image size, network calls, and concurrency. Optimize
   only evidenced bottlenecks; do not perform speculative optimization.
 
+"Operations: Instrumentation & Runtime Cleanup": |
+  Review operational artifacts for duplicated telemetry, debug output, redundant
+  health checks, obsolete runtime flags, overlapping retries, and stale operational
+  configuration. Keep only mechanisms that materially support this architecture.
+
 # Wave 7: Assurance
 "Assurance: Application Security Hardening": |
   Review the final application attack surface. Check authentication,
@@ -159,7 +176,34 @@
   and jurisdiction assumptions. Prepare necessary drafts and open items without
   claiming certification.
 
-# Wave 8: Delivery
+# Wave 8: Cleanup
+"Cleanup: Dead Code & Unused Surface": |
+  Review production code reachable from real entry points. Use project-appropriate
+  dead-code or unused-export analysis where useful, verify dynamic usage, and remove
+  only confidently unreachable modules, exports, endpoints, assets, and flags.
+
+"Cleanup: Dependencies, Scripts & Configuration": |
+  Review dependencies, scripts, environment variables, configuration, CI fragments,
+  and feature flags. Use dependency analysis where useful; remove only confidently
+  unused or obsolete items and keep manifests, lockfiles, and docs consistent.
+
+"Cleanup: Duplication & Consolidation": |
+  Review duplicated code, domain rules, schemas, adapters, utilities, and fixtures.
+  Use project-appropriate duplicate detection where useful, then consolidate only
+  material duplication into the simplest existing or shared implementation.
+
+"Cleanup: Temporary, Legacy & Debug Artifacts": |
+  Review temporary shims, compatibility paths, commented code, debug logging,
+  experimental endpoints, stale flags, generated leftovers, and abandoned TODOs.
+  Remove only artifacts that are clearly obsolete; preserve required history and
+  migrations.
+
+"Cleanup: Owned Code Reduction": |
+  Review whether custom code can be safely deleted or replaced by already-used
+  standard-library, platform, framework, or project primitives. Reduce maintenance
+  surface without adding dependency churn or rewriting stable code for aesthetics.
+
+# Wave 9: Delivery
 "Delivery: CI Quality Gates": |
   Review whether the stable checks the project now relies on run automatically
   before merge or release. Include only relevant install, formatting, lint,
