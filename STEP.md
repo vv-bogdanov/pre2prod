@@ -92,12 +92,12 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 ### Verification
 
-- [ ] `verification-core-unit-invariants` — Core Unit & Invariants
-- [ ] `verification-integration` — Integration
-- [ ] `verification-contracts-compatibility` — Contracts & Compatibility
-- [ ] `verification-end-to-end-critical-journeys` — End-to-End Critical Journeys
-- [ ] `verification-test-suite-quality-stability` — Test Suite Quality & Stability
-- [ ] `verification-static-analysis-formatting` — Static Analysis & Formatting
+- [x] `verification-core-unit-invariants` — Core Unit & Invariants
+- [x] `verification-integration` — Integration
+- [x] `verification-contracts-compatibility` — Contracts & Compatibility
+- [x] `verification-end-to-end-critical-journeys` — End-to-End Critical Journeys
+- [x] `verification-test-suite-quality-stability` — Test Suite Quality & Stability
+- [x] `verification-static-analysis-formatting` — Static Analysis & Formatting
 
 ### Operations
 
