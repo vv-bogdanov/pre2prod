@@ -88,16 +88,19 @@ export class Pre2prodPipeline {
         isRepeat: false,
       };
 
-      await this.#runTurnWithProgress(() => {
-        return this.#runtime.runTurn({
-        threadId: reviewer.id,
-        prompt: initialDiscoveryPrompt(options.instructions),
-        cwd: options.cwd,
-        sandbox: "read-only",
-        outputSchema: REVIEW_RESULT_SCHEMA,
-        logContext: discoveryLogContext,
-      });
-      }, discoveryLogContext);
+      await this.#runTurnWithProgress(
+        () =>
+          this.#runtime.runTurn({
+            threadId: reviewer.id,
+            prompt: initialDiscoveryPrompt(options.instructions),
+            cwd: options.cwd,
+            sandbox: "read-only",
+            outputSchema: REVIEW_RESULT_SCHEMA,
+            logContext: discoveryLogContext,
+          }),
+        discoveryLogContext,
+        "Studying repository structure and baseline context",
+      );
       this.#logger.log(
         "info",
         "pipeline.discovery.completed",
@@ -208,8 +211,9 @@ export class Pre2prodPipeline {
         { summary: true },
       );
       this.#reporter.reviewing(isRepeat);
+      const reviewObjective = this.#reviewGoalObjective(phase, iteration);
       await this.#runtime.setThreadGoal(reviewerThreadId, {
-        objective: this.#reviewGoalObjective(phase, iteration),
+        objective: reviewObjective,
         status: "active",
       });
 
@@ -227,6 +231,7 @@ export class Pre2prodPipeline {
               logContext: reviewLogContext,
             }),
           reviewLogContext,
+          reviewObjective,
         );
         review = parseReviewResult(reviewTurn.text);
         latestBlockers = review.blockers;
@@ -345,8 +350,13 @@ export class Pre2prodPipeline {
         },
         { summary: true },
       );
+      const planningObjective = this.#workerPlanningGoalObjective(phase, iteration);
+      const executionObjective = this.#workerExecutionGoalObjective(
+        phase,
+        iteration,
+      );
       await this.#runtime.setThreadGoal(worker.id, {
-        objective: this.#workerPlanningGoalObjective(phase, iteration),
+        objective: planningObjective,
         status: "active",
       });
       try {
@@ -377,6 +387,7 @@ export class Pre2prodPipeline {
               logContext: planningContext,
             }),
           planningContext,
+          planningObjective,
         );
         await assertPlanExists(options.cwd);
         this.#logger.log(
@@ -392,7 +403,7 @@ export class Pre2prodPipeline {
 
         this.#reporter.working();
         await this.#runtime.setThreadGoal(worker.id, {
-          objective: this.#workerExecutionGoalObjective(phase, iteration),
+          objective: executionObjective,
           status: "active",
         });
         const executionContext = this.#buildTurnContext(
@@ -431,6 +442,7 @@ export class Pre2prodPipeline {
               logContext: executionContext,
             }),
           executionContext,
+          executionObjective,
         );
         this.#logger.log(
           "info",
@@ -521,10 +533,11 @@ export class Pre2prodPipeline {
   async #runTurnWithProgress<T>(
     runTurn: () => Promise<T>,
     context: TurnLogContext,
+    action = "running",
   ): Promise<T> {
     const startedAt = Date.now();
     this.#reporter.waiting(
-      `${context.threadRole}/${context.phaseTurn} started (phase ${context.phaseIndex}, iteration ${context.phaseIteration})`,
+      `${context.threadRole}/${context.phaseTurn} started: ${action} (phase ${context.phaseIndex}, iteration ${context.phaseIteration})`,
     );
 
     const timer = setInterval(() => {

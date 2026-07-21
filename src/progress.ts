@@ -74,11 +74,22 @@ export class ConsoleProgressReporter implements ProgressReporter {
       return;
     }
     const contextLabel = this.#formatContext(context);
-    for (const line of splitLines(message)) {
+    const prettyJson = tryPrettyJsonLines(message);
+    const lines = prettyJson ?? splitLines(message);
+    const prefix = `      ${contextLabel} think:`;
+    if (prettyJson) {
+      for (const [index, line] of lines.entries()) {
+        const continuationPrefix = index === 0 ? `${prefix} ` : " ".repeat(prefix.length + 1);
+        console.log(pc.dim(`${continuationPrefix}${line}`));
+      }
+      return;
+    }
+
+    for (const line of lines) {
       if (!line.trim()) {
         continue;
       }
-      console.log(pc.dim(`      ${contextLabel} think: ${line}`));
+      console.log(pc.dim(`${prefix} ${line}`));
     }
   }
 
@@ -137,4 +148,22 @@ export class ConsoleProgressReporter implements ProgressReporter {
 
 function splitLines(text: string): string[] {
   return text.trim().split(/\r?\n/);
+}
+
+function tryPrettyJsonLines(text: string): string[] | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (
+    (trimmed[0] !== "{" && trimmed[0] !== "[") ||
+    (trimmed.at(-1) !== "}" && trimmed.at(-1) !== "]")
+  ) {
+    return null;
+  }
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2).split(/\r?\n/);
+  } catch {
+    return null;
+  }
 }
