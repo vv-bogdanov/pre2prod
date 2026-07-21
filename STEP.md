@@ -71,7 +71,7 @@ art for its MVP scope.
 - [x] `architecture-system-shape-dependency-boundaries` — System Shape & Dependency Boundaries
 - [x] `architecture-data-model-persistence` — Data Model & Persistence
 - [x] `architecture-dead-code-dependency-cleanup` — Dead Code & Dependency Cleanup
-- [ ] `architecture-simplification-deduplication` — Simplification & Deduplication
+- [x] `architecture-simplification-deduplication` — Simplification & Deduplication
 
 ### Correctness
 
