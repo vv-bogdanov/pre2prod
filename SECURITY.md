@@ -2,8 +2,8 @@
 
 ## Supported version
 
-Pre2prod is an MVP. Security fixes are made on the current `main` branch and
-included in the next published version; older versions are not maintained.
+Pre2Prod security fixes are made on the current `main` branch and included in
+the next published version; older versions are not maintained.
 
 ## Reporting a vulnerability
 
@@ -20,6 +20,6 @@ scope, and coordinate a fix and disclosure without claiming a response SLA.
 
 Reports about command execution, filesystem boundaries, Git safety, credential
 exposure, Codex App Server protocol handling, and dependency vulnerabilities
-are in scope. Provider account policy, model behavior outside Pre2prod's
+are in scope. Provider account policy, model behavior outside Pre2Prod's
 controls, and production deployment of repositories modified by the tool are
 outside this project's direct control.

@@ -1,6 +1,6 @@
 # Releasing
 
-Pre2prod is distributed as an npm CLI. A packed tarball is the local release
+Pre2Prod is distributed as an npm CLI. A packed tarball is the local release
 candidate; there is no service deployment, migration, or container image.
 
 ## Prepare a release candidate
@@ -20,10 +20,16 @@ prefix, and invokes the installed CLI.
 
 ## Publish
 
-Public publication is intentionally blocked until the repository owner has
-configured npm package ownership and GitHub-to-npm trusted publishing. Add and
-review a dedicated OIDC release workflow before the first publication; do not
-store a long-lived npm token in this repository.
+After the release candidate passes, an authenticated package owner can publish
+the current version with:
+
+```bash
+npm publish --access public
+```
+
+Verify the registry package before tagging the same commit. A future automated
+release should use npm trusted publishing; do not store a long-lived npm token
+in this repository.
 
 ## Recover from a bad release
 

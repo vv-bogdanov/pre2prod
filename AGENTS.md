@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build and maintain the smallest reliable MVP of the Pre2prod reviewer-led repository hardening CLI.
+Build and maintain the smallest reliable MVP of the Pre2Prod reviewer-led repository hardening CLI.
 
 Required vertical flow:
 

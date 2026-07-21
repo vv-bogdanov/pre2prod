@@ -1,6 +1,6 @@
 # Contributing
 
-Pre2prod is intentionally a small TypeScript CLI. Changes should preserve the
+Pre2Prod is intentionally a small TypeScript CLI. Changes should preserve the
 Reviewer/Worker flow and the KISS/YAGNI constraints in `AGENTS.md`.
 
 ## Setup

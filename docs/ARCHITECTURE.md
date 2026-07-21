@@ -19,7 +19,7 @@ Reviewer thread (persistent for the whole run)
 The Worker transcript never enters the Reviewer thread. The Reviewer sees only the changed workspace and retains its own high-level understanding of the project.
 
 The App Server Worker fork is non-ephemeral because the goal API is unavailable
-on ephemeral threads. It is still disposable in Pre2prod: it is never resumed
+on ephemeral threads. It is still disposable in Pre2Prod: it is never resumed
 or merged back into the Reviewer, and the App Server process closes at run end.
 
 ## Components
@@ -47,7 +47,8 @@ The repository intentionally implements only the App Server methods it uses:
 - `turn/start`
 - turn/item notifications
 
-Before publishing, test against the exact installed Codex version. The Codex CLI can generate version-specific types with:
+Before each release, test against the exact installed Codex version. The Codex
+CLI can generate version-specific types with:
 
 ```bash
 codex app-server generate-ts --out ./schemas

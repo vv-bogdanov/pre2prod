@@ -1,27 +1,29 @@
-# pre2prod 💩→🍭
+# Pre2Prod 💩→🍭
 
 [![npm](https://img.shields.io/npm/v/pre2prod.svg)](https://www.npmjs.com/package/pre2prod)
 [![CI](https://github.com/vv-bogdanov/pre2prod/actions/workflows/ci.yml/badge.svg)](https://github.com/vv-bogdanov/pre2prod/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**A reviewer-led Codex CLI that turns an existing repository into a
-production-ready MVP**
+## The missing second half of vibe coding
 
-> Thousands of new products are vibe-coded every day,
-> but only a small fraction ever reach production.
->
-> Pre2Prod closes that gap with a carefully designed,
-> best-practice workflow that progressively restructures,
-> validates, tests, hardens, and prepares a repository
-> for deployment — almost automatically.
+**From vibe-coded PoC to production-ready MVP.**
 
-Pre2prod reviews the real repository, fixes material gaps through temporary
-Worker agents, verifies every change independently, and records phase
-checkpoints in Git. It is noninteractive and adapts its checks to the project's
-actual language, framework, architecture, and scale.
+Vibe coding can produce a working prototype in hours. Turning it into a clean,
+tested, secure, maintainable, and deployable product still requires a long
+sequence of engineering reviews.
+
+Pre2Prod automates that workflow with a persistent GPT-5.6 Reviewer and
+temporary Codex Workers that plan and implement material improvements directly
+in the repository. The Reviewer then verifies every change independently.
+
+```bash
+npx --yes pre2prod
+```
+
+**41 expert reviews · 9 production-readiness stages · configurable through YAML**
 
 > [!IMPORTANT]
-> Pre2prod requires a clean Git repository and an installed, authenticated Codex
+> Pre2Prod requires a clean Git repository and an installed, authenticated Codex
 > CLI. It changes source code, but never deploys or performs destructive
 > production operations. Review the resulting diff before using it in staging.
 
@@ -46,9 +48,46 @@ npx --yes pre2prod \
   "Preserve the monolith, prefer Railway, and avoid paid services"
 ```
 
+## Demo
+
+[Watch the demo on YouTube](YOUTUBE_URL)
+
+The demo shows Pre2Prod running on its own repository while the Reviewer and
+Workers progress through the configured production-readiness workflow.
+
+## Quick evaluation
+
+Check the local environment and inspect the built-in workflow:
+
+```bash
+npx --yes pre2prod doctor
+npx --yes pre2prod --list
+```
+
+Run one focused review inside a clean Git repository:
+
+```bash
+npx --yes pre2prod \
+  -p foundation-immediate-risk-triage \
+  --max-iterations 1
+```
+
+Pre2Prod modifies source code when material blockers are found. Run it only in
+a clean Git repository that you are prepared to review.
+
+## Supported platforms
+
+- Linux (Ubuntu 24.04): tested in CI and during local dogfooding.
+- macOS: expected to work, but not yet verified by CI or a documented live run.
+- Windows: expected through WSL2, but not yet verified by CI or a documented
+  live run.
+
+Requires Node.js 20.19 or newer, Git, and an installed and authenticated Codex
+CLI with App Server support.
+
 ## How it works
 
-Pre2prod keeps one Reviewer thread for the entire run. A phase with no blockers
+Pre2Prod keeps one Reviewer thread for the entire run. A phase with no blockers
 passes immediately. Material blockers fork a temporary Worker from the exact
 review turn; that Worker plans in read-only mode, receives a goal, applies the
 plan, and returns control to the persistent Reviewer.
@@ -73,8 +112,26 @@ Reviewer independently re-reads the changed repository. Optional
 `non_blockers` never trigger a Worker.
 
 By default, a phase gets up to three Worker iterations. If blockers remain,
-Pre2prod warns, records the unresolved findings, and continues to the next
+Pre2Prod warns, records the unresolved findings, and continues to the next
 phase so the final summary can identify phases worth rerunning.
+
+## Built with Codex and GPT-5.6
+
+Pre2Prod uses Codex App Server as its execution runtime.
+
+- GPT-5.6 powers the persistent Reviewer that accumulates repository context
+  across the complete workflow.
+- Codex thread forking creates temporary Workers from the exact review turn
+  that discovered the blockers.
+- Workers plan in read-only mode before receiving workspace-write access to
+  execute the plan.
+- Structured output separates material `blockers` from informational
+  `non_blockers`.
+- The original Reviewer independently re-reads the changed repository after
+  every Worker execution.
+
+Pre2Prod itself was improved by running this workflow on its own repository.
+The resulting phase checkpoints are visible in the public Git history.
 
 ## Usage
 
@@ -132,11 +189,12 @@ default. Use `--verbose` for additional App Server detail.
 
 ### Models and local providers
 
-Without flags, Pre2prod uses the model and provider configured by Codex. A model
-or supported local provider can be selected explicitly:
+Without flags, Pre2Prod uses the model and provider configured by Codex. The
+Build Week submission was developed and dogfooded with GPT-5.6. Explicit model
+IDs must be supported by the installed Codex CLI; a supported local provider
+can also be selected:
 
 ```bash
-pre2prod --model gpt-5.3-codex
 pre2prod --local-provider ollama --model your-local-model
 ```
 
@@ -208,7 +266,7 @@ Delivery
 
 ## Custom phases
 
-Pre2prod uses the first `phases.yaml` found in this order:
+Pre2Prod uses the first `phases.yaml` found in this order:
 
 1. `<project>/.pre2prod/phases.yaml`
 2. `$HOME/.pre2prod/phases.yaml`
@@ -264,24 +322,24 @@ pre2prod doctor -C .
 
 - Git is required. A missing repository fails with an instruction to run
   `git init`.
-- The working tree must be clean; Pre2prod never stashes, resets, or cleans user
+- The working tree must be clean; Pre2Prod never stashes, resets, or cleans user
   changes.
-- By default, Pre2prod creates `pre2prod/<timestamp>` and commits each phase
+- By default, Pre2Prod creates `pre2prod/<timestamp>` and commits each phase
   checkpoint. `--no-commit` keeps changes on the current branch.
 - Reviewer turns are read-only. Only Worker execution turns receive
   workspace-write access.
 - Plans and default logs are excluded through `.git/info/exclude`, not by
   modifying the project's `.gitignore`.
-- Pre2prod does not deploy, promote, migrate, or operate production systems.
+- Pre2Prod does not deploy, promote, migrate, or operate production systems.
 
 ## Data and privacy
 
-Pre2prod sends repository material, prompts, and tool context required for each
+Pre2Prod sends repository material, prompts, and tool context required for each
 turn to the selected Codex or local model provider. Provider-side processing
 and retention follow that provider's configuration and terms. Do not run it on
 source or data you are not authorized to share.
 
-Pre2prod itself has no analytics service. Local diagnostics stay under
+Pre2Prod itself has no analytics service. Local diagnostics stay under
 `.pre2prod`; remove that directory when its logs, plans, and reports are no
 longer needed.
 
@@ -291,7 +349,7 @@ longer needed.
   inspect `pre2prod logs`, and consult
   [`docs/LIVE_COMPATIBILITY_CHECKLIST.md`](docs/LIVE_COMPATIBILITY_CHECKLIST.md).
 - **Long-running turns:** increase `--turn-timeout`; the default is 120 minutes.
-- **Dirty working tree:** commit or stash changes. Pre2prod never does this
+- **Dirty working tree:** commit or stash changes. Pre2Prod never does this
   automatically.
 - **`ERR_PNPM_NO_GLOBAL_BIN_DIR`:** run `pnpm setup`, restart the shell, and
   confirm `PNPM_HOME` is on `PATH`. During development, use `node dist/cli.js`
@@ -332,13 +390,3 @@ pnpm run release:check
 This runs formatting, typechecking, linting, coverage, build, production
 dependency audit, tarball creation, clean installation, and installed CLI
 smoke testing.
-
-## TODO
-
-- Move shared Reviewer and Worker prompts into layered, overridable YAML
-  resources.
-- Decide how Reviewer `non_blockers` should be retained or surfaced. They must
-  remain informational and must not be sent to the Worker.
-- Resume interrupted runs from the last safe phase or turn boundary without
-  replaying a Worker side effect whose completion is unknown.
-- Add npm trusted publishing after the initial manual release.
