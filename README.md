@@ -17,18 +17,12 @@ through a simple reviewer-led loop. One phase runs as follows:
 
 ```mermaid
 flowchart TD
-    R0["Persistent Reviewer context<br/>repository discovery and prior phases"] --> R1["Review current phase<br/>read-only, structured findings"]
-    R1 --> B{"Any blockers?"}
-    B -- No --> P["Phase passes<br/>optional checkpoint commit"]
-    P --> N["Next phase<br/>same Reviewer thread"]
-    B -- Yes --> F["Fork Worker from<br/>the exact Reviewer turn"]
-    F --> W0["Worker context<br/>Reviewer context plus blockers"]
-    W0 --> W1["Plan remediation<br/>read-only turn"]
-    W1 --> PF["CLI writes PRE2PROD_PLAN.md"]
-    PF --> G["Set execution goal<br/>on the same Worker"]
-    G --> W2["Execute the plan<br/>workspace-write turn"]
-    W2 -. "repository changes only; no Worker transcript" .-> R2["Reviewer independently re-reads<br/>the current repository"]
-    R2 --> B
+    I["Initial review"] --> R["Phase review"]
+    R --> B{"Blockers found?"}
+    B -- No --> N["Next phase"]
+    B -- Yes --> P["/fork Worker<br/>plan (read-only)"]
+    P --> F["/goal Worker<br/>fix plan"]
+    F --> R
 ```
 
 ## Status
