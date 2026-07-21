@@ -81,9 +81,9 @@ a consolidated report and recommendations for the CLI's MVP scope.
 
 - [x] `correctness-type-safety` — Type Safety
 - [x] `correctness-runtime-contracts` — Runtime Contracts
-- [ ] `correctness-error-handling` — Error Handling
-- [ ] `correctness-failure-diagnostics` — Failure Diagnostics
-- [ ] `correctness-data-integrity-migrations` — Data Integrity & Migrations
+- [x] `correctness-error-handling` — Error Handling
+- [x] `correctness-failure-diagnostics` — Failure Diagnostics
+- [x] `correctness-data-integrity-migrations` — Data Integrity & Migrations
 
 ### Product
 
