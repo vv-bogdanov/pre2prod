@@ -72,15 +72,15 @@ phase so the final summary can identify phases worth rerunning.
 
 Common commands:
 
-| Command                               | Purpose                                                        |
-| ------------------------------------- | -------------------------------------------------------------- |
-| `pre2prod`                            | Run every selected phase                                       |
-| `pre2prod -l`                         | List phases and their selection slugs                          |
-| `pre2prod -p foundation,architecture` | Include phase groups or exact slugs                            |
-| `pre2prod -x cleanup`                 | Exclude phase groups or exact slugs                            |
-| `pre2prod --no-commit`                | Keep changes uncommitted on the current branch                 |
-| `pre2prod doctor`                     | Check Git, Codex, authentication, and App Server compatibility |
-| `pre2prod logs --stats`               | Summarize previous runs and phase outcomes                     |
+```bash
+pre2prod                            # Run every selected phase
+pre2prod -l                         # List phases and selection slugs
+pre2prod -p foundation,architecture # Include groups or exact slugs
+pre2prod -x cleanup                 # Exclude groups or exact slugs
+pre2prod --no-commit                # Keep changes uncommitted
+pre2prod doctor                     # Check local prerequisites
+pre2prod logs --stats               # Summarize previous runs
+```
 
 Run `pre2prod --help` or `pre2prod logs --help` for the complete option list.
 
