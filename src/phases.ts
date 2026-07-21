@@ -205,7 +205,7 @@ function parsePhaseRecords(
     }
 
     const id = toPhaseId(phaseId);
-    const titleFromKey = slugToTitle(phaseId);
+    const titleFromKey = inferPhaseTitleFromKey(phaseId);
     if (typeof phaseConfig === "string") {
       const reviewerPrompt = toNonEmptyString(
         phaseConfig,
@@ -241,6 +241,15 @@ function parsePhaseRecords(
     phases.push({ id, title, reviewerPrompt });
   }
   return phases;
+}
+
+function inferPhaseTitleFromKey(key: string): string {
+  const titleFromKey = key.trim();
+  if (titleFromKey.includes(" ")) {
+    return titleFromKey;
+  }
+
+  return slugToTitle(titleFromKey);
 }
 
 function toNonEmptyString(

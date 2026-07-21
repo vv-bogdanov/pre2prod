@@ -54,11 +54,9 @@ describe("loadPhases", () => {
   it("supports kv format and infers ids by key/title", async () => {
     const cwd = await newTempDir("pre2prod-phases-kv-");
     const projectConfig =
+      '"Architecture and maintainability": |\n' +
+      "  Verify architectural boundaries and coupling\n" +
       "security:\n" +
-      "  title: Security\n" +
-      "  reviewerPrompt: |\n" +
-      "    Validate authentication and data handling\n" +
-      "reproducibility-build:\n" +
       "  reviewerPrompt: |\n" +
       "    Validate build and packaging flow\n";
 
@@ -71,13 +69,13 @@ describe("loadPhases", () => {
 
     expect(phases).toEqual([
       {
-        id: "security",
-        title: "Security",
-        reviewerPrompt: "Validate authentication and data handling",
+        id: "architecture-and-maintainability",
+        title: "Architecture and maintainability",
+        reviewerPrompt: "Verify architectural boundaries and coupling",
       },
       {
-        id: "reproducibility-build",
-        title: "Reproducibility Build",
+        id: "security",
+        title: "Security",
         reviewerPrompt: "Validate build and packaging flow",
       },
     ]);
@@ -108,7 +106,7 @@ describe("loadPhases", () => {
 
     const phases = await loadPhases(cwd);
 
-    expect(phases[0]?.id).toBe("reproducibility-build");
+    expect(phases[0]?.id).toBe("reproducibility-and-build");
     expect(phases).toHaveLength(6);
   });
 

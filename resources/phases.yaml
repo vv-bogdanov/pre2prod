@@ -1,63 +1,51 @@
-reproducibility-build:
-  title: Reproducibility and build
-  reviewerPrompt: |
-    Review whether this repository can be understood, installed, configured, built,
-    and started reproducibly from a clean environment.
-    Check runtime and package-manager consistency, lockfiles, environment
-    documentation and validation, build/start scripts, migrations or setup steps,
-    and obvious local-machine assumptions.
-    Require only material fixes for this application's actual type and scale.
+"Reproducibility and build": |
+  Review whether this repository can be understood, installed, configured, built,
+  and started reproducibly from a clean environment.
+  Check runtime and package-manager consistency, lockfiles, environment
+  documentation and validation, build/start scripts, migrations or setup steps,
+  and obvious local-machine assumptions.
+  Require only material fixes for this application's actual type and scale.
 
-testing:
-  title: Testing
-  reviewerPrompt: |
-    Review whether the repository has a necessary and sufficient safety net for its
-    critical behavior and future changes.
-    Inspect business rules, important user journeys, persistence and external
-    integrations, failure paths, concurrency or idempotency where relevant, and
-    existing test reliability.
-    Do not demand 100% coverage or tests that merely inflate metrics.
+Testing: |
+  Review whether the repository has a necessary and sufficient safety net for its
+  critical behavior and future changes.
+  Inspect business rules, important user journeys, persistence and external
+  integrations, failure paths, concurrency or idempotency where relevant, and
+  existing test reliability.
+  Do not demand 100% coverage or tests that merely inflate metrics.
 
-architecture-maintainability:
-  title: Architecture and maintainability
-  reviewerPrompt: |
-    Review material architectural and maintainability risks.
-    Look for harmful coupling, duplicated behavior, hidden side effects, oversized
-    modules, unclear boundaries around the business core and external integrations,
-    global mutable state, and obstacles to reasonable team or traffic growth.
-    Preserve KISS and YAGNI: do not require clean-architecture ceremony,
-    microservices, Kubernetes, or speculative abstractions.
+"Architecture and maintainability": |
+  Review material architectural and maintainability risks.
+  Look for harmful coupling, duplicated behavior, hidden side effects, oversized
+  modules, unclear boundaries around the business core and external integrations,
+  global mutable state, and obstacles to reasonable team or traffic growth.
+  Preserve KISS and YAGNI: do not require clean-architecture ceremony,
+  microservices, Kubernetes, or speculative abstractions.
 
-security:
-  title: Security
-  reviewerPrompt: |
-    Review the security posture relevant to this project:
-    authentication, authorization, tenant or trust boundaries, input and runtime
-    validation, sessions, secrets, sensitive logging, dependency risks, common web
-    attack surfaces, uploads, webhooks, rate limits, and unsafe defaults.
-    Focus on exploitable or materially risky gaps; do not claim regulatory
-    certification.
+Security: |
+  Review the security posture relevant to this project:
+  authentication, authorization, tenant or trust boundaries, input and runtime
+  validation, sessions, secrets, sensitive logging, dependency risks, common web
+  attack surfaces, uploads, webhooks, rate limits, and unsafe defaults.
+  Focus on exploitable or materially risky gaps; do not claim regulatory
+  certification.
 
-repository-ci:
-  title: Repository and CI
-  reviewerPrompt: |
-    Review whether another engineer can work with and review this repository
-    reliably.
-    Check essential scripts, concise setup documentation, CI checks, dependency
-    locking, safe secret handling, and repository hygiene.
-    Add only documentation and automation that materially improve repeatability and
-    reviewability.
+"Repository and CI": |
+  Review whether another engineer can work with and review this repository
+  reliably.
+  Check essential scripts, concise setup documentation, CI checks, dependency
+  locking, safe secret handling, and repository hygiene.
+  Add only documentation and automation that materially improve repeatability and
+  reviewability.
 
-deployment-readiness:
-  title: Deployment readiness
-  reviewerPrompt: |
-    Review whether the project is prepared for a simple and reliable staging
-    deployment.
-    Prefer an existing target. Otherwise choose the simplest suitable managed
-    platform and preserve the current architecture.
-    Avoid Kubernetes and complex cloud infrastructure without a concrete need.
-    Railway is a reasonable soft default for a typical backend with PostgreSQL.
-    Missing credentials must not block local preparation:
-    configuration, build/start commands, health checks, migrations, and deployment
-    instructions should still be prepared.
-    Do not perform destructive production operations.
+"Deployment readiness": |
+  Review whether the project is prepared for a simple and reliable staging
+  deployment.
+  Prefer an existing target. Otherwise choose the simplest suitable managed
+  platform and preserve the current architecture.
+  Avoid Kubernetes and complex cloud infrastructure without a concrete need.
+  Railway is a reasonable soft default for a typical backend with PostgreSQL.
+  Missing credentials must not block local preparation:
+  configuration, build/start commands, health checks, migrations, and deployment
+  instructions should still be prepared.
+  Do not perform destructive production operations.
