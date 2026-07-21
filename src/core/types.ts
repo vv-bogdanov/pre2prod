@@ -94,6 +94,7 @@ export interface PipelineOptions {
   maxIterationsPerPhase: number;
   networkAccess: boolean;
   commit?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface PhaseSummary {

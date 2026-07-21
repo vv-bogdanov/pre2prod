@@ -146,7 +146,14 @@ program
         logger,
       );
 
+      const abortController = new AbortController();
+      let shuttingDown = false;
       const shutdown = (signal: NodeJS.Signals): void => {
+        if (shuttingDown) {
+          return;
+        }
+        shuttingDown = true;
+        abortController.abort();
         reporter.warning(`Received ${signal}; shutting down App Server...`);
         void runtime.close().catch((error: unknown) => {
           reporter.warning(
@@ -168,6 +175,7 @@ program
           maxIterationsPerPhase: options.maxIterations,
           networkAccess: options.network,
           commit: options.commit,
+          signal: abortController.signal,
         });
       } finally {
         process.off("SIGINT", onInterrupt);

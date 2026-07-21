@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { Pre2prodError } from "./core/errors.js";
+import { Pre2prodError, throwIfAborted } from "./core/errors.js";
 import type { ProgressReporter } from "./core/types.js";
 
 const execFileAsync = promisify(execFile);
@@ -10,7 +10,10 @@ const GIT_COMMAND_TIMEOUT_MS = 30_000;
 export interface GitSession {
   enabled: true;
   branch: string;
-  commitPhase(phase: { id: string; title: string }): Promise<void>;
+  commitPhase(
+    phase: { id: string; title: string },
+    signal?: AbortSignal,
+  ): Promise<void>;
 }
 
 export interface PrepareGitOptions {
@@ -67,18 +70,22 @@ ${GIT_COMMAND_HINT}`);
   return {
     enabled: true,
     branch,
-    async commitPhase(phase) {
+    async commitPhase(phase, signal) {
+      throwIfAborted(signal);
       const slug = normalizePhaseIdentifier(phase);
       const safeTitle = normalizeCommitTitle(phase.title);
       const message = `pre2prod(${slug}): ${safeTitle}`;
 
       try {
         await git(cwd, ["add", "-A"]);
+        throwIfAborted(signal);
         await git(cwd, ["reset", "-q", "--", "PRE2PROD_PLAN.md"], true);
+        throwIfAborted(signal);
         const staged = await git(cwd, ["diff", "--cached", "--quiet"], true);
         if (staged.exitCode === 0) {
           return;
         }
+        throwIfAborted(signal);
         await git(cwd, [
           "-c",
           "user.name=Pre2prod",
@@ -89,6 +96,9 @@ ${GIT_COMMAND_HINT}`);
           message,
         ]);
       } catch (error) {
+        if (error instanceof Pre2prodError) {
+          throw error;
+        }
         throw new Pre2prodError(
           `Git checkpoint commit failed: ${messageOf(error)}`,
         );

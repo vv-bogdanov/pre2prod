@@ -11,7 +11,11 @@ import type {
   PipelineResult,
   ProgressReporter,
 } from "./core/types.js";
-import { PhaseFailedError, Pre2prodError } from "./core/errors.js";
+import {
+  PhaseFailedError,
+  Pre2prodError,
+  throwIfAborted,
+} from "./core/errors.js";
 import { prepareGit, workingTreeStatus } from "./git.js";
 import { loadPhases } from "./phases.js";
 import {
@@ -46,6 +50,7 @@ export class Pre2prodPipeline {
 
   public async run(options: PipelineOptions): Promise<PipelineResult> {
     this.#reporter.title();
+    throwIfAborted(options.signal);
     const phases = this.#phases ?? (await loadPhases(options.cwd));
     const runId = this.#logger.runId;
     const commit = options.commit ?? true;
@@ -67,9 +72,11 @@ export class Pre2prodPipeline {
 
     try {
       await this.#runtime.initialize();
+      throwIfAborted(options.signal);
       const git = await prepareGit(options.cwd, this.#reporter, {
         createBranch: commit,
       });
+      throwIfAborted(options.signal);
       const reviewer = await this.#runtime.startThread({
         cwd: options.cwd,
         ...(options.model ? { model: options.model } : {}),
@@ -104,7 +111,9 @@ export class Pre2prodPipeline {
           }),
         discoveryLogContext,
         "Studying repository structure and baseline context",
+        options.signal,
       );
+      throwIfAborted(options.signal);
       this.#logger.log(
         "info",
         "pipeline.discovery.completed",
@@ -118,6 +127,7 @@ export class Pre2prodPipeline {
       const summaries: PhaseSummary[] = [];
 
       for (const [index, phase] of phases.entries()) {
+        throwIfAborted(options.signal);
         this.#reporter.phaseStarted(index + 1, phases.length, phase);
         const summary = await this.#runPhase(
           reviewer.id,
@@ -126,7 +136,7 @@ export class Pre2prodPipeline {
           phases.length,
           options,
           commit
-            ? (phaseToCommit) => git.commitPhase(phaseToCommit)
+            ? (phaseToCommit) => git.commitPhase(phaseToCommit, options.signal)
             : () => Promise.resolve(),
         );
         summaries.push(summary);
@@ -172,11 +182,15 @@ export class Pre2prodPipeline {
     phaseIndex: number,
     phaseTotal: number,
     options: PipelineOptions,
-    commitPhase: (phaseToCommit: {
-      id: string;
-      title: string;
-    }) => Promise<void>,
+    commitPhase: (
+      phaseToCommit: {
+        id: string;
+        title: string;
+      },
+      signal?: AbortSignal,
+    ) => Promise<void>,
   ): Promise<PhaseSummary> {
+    throwIfAborted(options.signal);
     let isRepeat = false;
     let latestBlockers: string[] = [];
     const runId = this.#logger.runId;
@@ -197,6 +211,7 @@ export class Pre2prodPipeline {
       iteration <= options.maxIterationsPerPhase;
       iteration += 1
     ) {
+      throwIfAborted(options.signal);
       const phaseIteration = iteration + 1;
       const reviewLogContext = this.#buildTurnContext(
         phase,
@@ -236,9 +251,11 @@ export class Pre2prodPipeline {
             }),
           reviewLogContext,
           `${phase.title} review (iteration ${phaseIteration})`,
+          options.signal,
         );
         review = parseReviewResult(reviewTurn.text);
         latestBlockers = review.blockers;
+        throwIfAborted(options.signal);
 
         this.#logger.log(
           "info",
@@ -269,7 +286,16 @@ export class Pre2prodPipeline {
       }
 
       if (review.blockers.length === 0) {
-        await archivePlan(options.cwd, runId, phase, phaseIteration);
+        await archivePlan(
+          options.cwd,
+          runId,
+          phase,
+          phaseIteration,
+          options.signal,
+        );
+        throwIfAborted(options.signal);
+        await commitPhase(phase, options.signal);
+        throwIfAborted(options.signal);
         this.#reporter.phasePassed();
         this.#logger.log(
           "info",
@@ -290,7 +316,6 @@ export class Pre2prodPipeline {
           },
           { summary: true },
         );
-        await commitPhase(phase);
         return { phase, iterations: iteration, passed: true, findings: [] };
       }
 
@@ -324,6 +349,7 @@ export class Pre2prodPipeline {
         );
       }
 
+      throwIfAborted(options.signal);
       const worker = await this.#runtime.forkThread(
         reviewerThreadId,
         reviewTurn.turnId,
@@ -340,6 +366,7 @@ export class Pre2prodPipeline {
         { summary: true },
       );
 
+      throwIfAborted(options.signal);
       await rm(resolve(options.cwd, PLAN_FILE), { force: true });
       this.#reporter.planning(PLAN_FILE);
       this.#logger.log(
@@ -380,7 +407,9 @@ export class Pre2prodPipeline {
           }),
         planningContext,
         `${phase.title} worker planning (iteration ${phaseIteration})`,
+        options.signal,
       );
+      throwIfAborted(options.signal);
       await assertPlanExists(options.cwd);
       await assertOnlyPlanChanged(options.cwd);
       this.#logger.log(
@@ -417,6 +446,7 @@ export class Pre2prodPipeline {
         { summary: true },
       );
       const executionGoal = `${phase.title}: execute PRE2PROD_PLAN.md (iteration ${phaseIteration})`;
+      throwIfAborted(options.signal);
       await this.#runtime.setThreadGoal(worker.id, {
         objective: executionGoal,
         status: "active",
@@ -438,10 +468,14 @@ export class Pre2prodPipeline {
             }),
           executionContext,
           executionGoal,
+          options.signal,
         );
       } finally {
-        await this.#runtime.clearThreadGoal(worker.id);
+        if (!options.signal?.aborted) {
+          await this.#runtime.clearThreadGoal(worker.id);
+        }
       }
+      throwIfAborted(options.signal);
       this.#logger.log(
         "info",
         "phase.worker.execution.completed",
@@ -514,7 +548,9 @@ export class Pre2prodPipeline {
     runTurn: () => Promise<T>,
     context: TurnLogContext,
     action = "running",
+    signal?: AbortSignal,
   ): Promise<T> {
+    throwIfAborted(signal);
     const startedAt = Date.now();
     const turnLabel = `${context.threadRole}/${context.phaseTurn} ${context.phaseId}#${context.phaseIteration}`;
     this.#reporter.waiting(`${turnLabel} started: ${action}`);
@@ -587,7 +623,9 @@ async function archivePlan(
   runId: string,
   phase: Phase,
   phaseIteration: number,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfAborted(signal);
   const planPath = resolve(cwd, PLAN_FILE);
   try {
     await access(planPath);
@@ -598,7 +636,9 @@ async function archivePlan(
   const directory = resolve(cwd, ".pre2prod", "plans");
   const filename = `${fileSegment(runId)}-${fileSegment(phase.id)}-${phaseIteration}.md`;
 
+  throwIfAborted(signal);
   await mkdir(directory, { recursive: true });
+  throwIfAborted(signal);
   await rename(planPath, resolve(directory, filename));
 }
 

@@ -28,3 +28,9 @@ export class PhaseFailedError extends Pre2prodError {
     this.name = "PhaseFailedError";
   }
 }
+
+export function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new Pre2prodError("Pre2prod run interrupted");
+  }
+}

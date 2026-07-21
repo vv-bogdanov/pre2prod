@@ -52,6 +52,44 @@ describe("Pre2prodPipeline", () => {
     expect(runtime.forks).toHaveLength(0);
   });
 
+  it("does not archive or commit after cancellation during re-review", async () => {
+    const cwd = await createInitializedRepo();
+    const initialCommits = await countCommits(cwd);
+    const controller = new AbortController();
+    const runtime = new FakeRuntime(
+      cwd,
+      [
+        "Repository summary",
+        JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+        "Plan written",
+        "Plan executed",
+        JSON.stringify({ blockers: [], non_blockers: [] }),
+      ],
+      {
+        onRunTurn: (request) => {
+          if (request.prompt.includes("A worker has completed changes")) {
+            controller.abort();
+          }
+        },
+      },
+    );
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await expect(
+      pipeline.run({
+        cwd,
+        maxIterationsPerPhase: 2,
+        networkAccess: false,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow(/Pre2prod run interrupted/i);
+
+    expect(await countCommits(cwd)).toBe(initialCommits);
+    expect(await execGit(cwd, ["status", "--porcelain"])).toContain(
+      "?? PRE2PROD_PLAN.md",
+    );
+  });
+
   it("does not trigger worker for non_blockers only", async () => {
     const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
@@ -366,6 +404,7 @@ class FakeRuntime implements AgentRuntime {
   readonly #responses: string[];
   readonly #writePlan: boolean;
   readonly #planningExtraFile: string | undefined;
+  readonly #onRunTurn: ((request: TurnRequest) => void) | undefined;
   #turn = 0;
   #worker = 0;
   #goalStorage = new Map<string, ThreadGoal>();
@@ -373,12 +412,17 @@ class FakeRuntime implements AgentRuntime {
   public constructor(
     cwd: string,
     responses: string[],
-    options: { writePlan?: boolean; planningExtraFile?: string } = {},
+    options: {
+      writePlan?: boolean;
+      planningExtraFile?: string;
+      onRunTurn?: (request: TurnRequest) => void;
+    } = {},
   ) {
     this.#cwd = cwd;
     this.#responses = [...responses];
     this.#writePlan = options.writePlan ?? true;
     this.#planningExtraFile = options.planningExtraFile;
+    this.#onRunTurn = options.onRunTurn;
   }
 
   public async initialize(): Promise<void> {}
@@ -397,6 +441,7 @@ class FakeRuntime implements AgentRuntime {
 
   public async runTurn(request: TurnRequest): Promise<TurnResult> {
     this.requests.push(request);
+    this.#onRunTurn?.(request);
     const text = this.#responses.shift();
     if (text === undefined) {
       throw new Error("No fake response configured");
