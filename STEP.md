@@ -2,29 +2,35 @@
 
 ## Goal
 
-Run every Pre2prod phase against this repository, one phase at a time, without
-automatic checkpoint commits. After each run, inspect the diff and logs, write
-a report with recommendations, fix confirmed Pre2prod bugs or maintenance
-friction, and only then move to the next phase. Finish with a consolidated
-report and recommendations for bringing the CLI to an appropriate state of the
-art for its MVP scope.
+Run every Pre2prod phase against this repository in reviewed waves with
+automatic per-phase checkpoint commits. Each wave shares one persistent
+Reviewer and discovery pass. After a wave, inspect its commits and logs, write
+reports with recommendations, fix confirmed Pre2prod bugs or maintenance
+friction, and merge the accepted wave back into the dogfood branch. Finish with
+a consolidated report and recommendations for the CLI's MVP scope.
 
 ## Rules
 
-- Keep `main` clean; run the campaign from one dedicated working branch.
-- Use `--no-commit` for every phase run.
-- Run one phase only; never continue automatically to the next phase.
+- Keep `main` clean; use `dogfood/pre2prod-sota` as the reviewed integration
+  branch.
+- Start each wave without `--no-commit`; Pre2prod creates its own
+  `pre2prod/<timestamp>` wave branch and commits every passed phase.
+- Run only selected, unfinished phases in a logical group per wave. The
+  persistent Reviewer performs discovery once and stays alive across that wave.
+- Do not start a later wave until the current wave's commits, logs, reports,
+  and merge decision are reviewed.
 - Wait for an agent turn to complete instead of polling its status. If a
   progress check is necessary, perform it no more often than once every
   30 minutes.
-- Do not discard a Worker diff without an explicit decision after review.
+- If a wave stops on a failed phase, preserve its root Worker plan and diff,
+  inspect them before deciding whether to fix and rerun the phase.
 - Treat non-applicable phases as an evidence-based PASS, not a reason to add
   irrelevant product features.
 - Keep phase reports and the final report outside product commits unless a
   report becomes intentional repository documentation.
-- Store reports in `.pre2prod/reports/`; after reviewing a Worker plan,
-  preserve a copy there and remove `PRE2PROD_PLAN.md` from the repository root
-  before the next clean-start run.
+- Store reports in `.pre2prod/reports/`. The CLI archives successful Worker
+  plans in `.pre2prod/plans`; preserve failed-phase root plans in reports before
+  modifying or removing them.
 
 ## Preparation
 
@@ -37,25 +43,23 @@ art for its MVP scope.
       outcome, reviewer findings, Worker actions, changed files, validation,
       tool issues, recommendations, and commit decision.
 
-## Per-Phase Procedure
+## Wave Procedure
 
-- [ ] Run `pre2prod -p <phase-slug> --no-commit --max-iterations 1`.
-- [ ] Record the run ID, model/provider, branch, and elapsed result.
-- [ ] Inspect `git status`, `git diff --check`, `git diff --stat`, and full
-      `git diff`.
-- [ ] Inspect `PRE2PROD_PLAN.md` when a Worker ran.
-- [ ] Inspect summary and full logs filtered by run ID, role, and turn.
-- [ ] Verify the commands and checks claimed by the Worker independently when
-      relevant.
-- [ ] Write the phase report and recommendations.
-- [ ] If the change is acceptable, archive or remove `PRE2PROD_PLAN.md` as
-      appropriate and commit the reviewed change manually.
-- [ ] Rebuild the CLI with `pnpm run build` after every accepted phase and
-      before starting the next one.
-- [ ] If Pre2prod itself has a confirmed bug or harmful maintenance friction,
-      fix it with focused tests, validate it, and rerun the same phase.
-- [ ] If the Worker change is not acceptable, stop and decide the next action
-      before modifying or discarding it.
+- [ ] Start a wave from the clean dogfood branch with its selected phase group
+      and `--max-iterations 1`, without `--no-commit`.
+- [ ] Record the wave branch, run ID, model/provider, selected phases, and
+      result.
+- [ ] If it passes, inspect each checkpoint commit, `git diff` from the wave
+      base, archived plans, and summary/full logs grouped by phase and turn.
+- [ ] Independently verify material Worker claims and run validation relevant to
+      the combined wave diff.
+- [ ] Write one ignored report per phase from its commit and logs, including
+      recommendations and the commit decision.
+- [ ] Rebuild the CLI after accepting the wave, then merge it into the dogfood
+      branch before the next wave.
+- [ ] If it stops, inspect the failing phase's root plan, diff, and logs; fix
+      confirmed Pre2prod bugs with focused tests and rerun that phase before
+      resuming the wave plan.
 
 ## Phase Flight
 
@@ -76,7 +80,7 @@ art for its MVP scope.
 ### Correctness
 
 - [x] `correctness-type-safety` — Type Safety
-- [ ] `correctness-runtime-contracts` — Runtime Contracts
+- [x] `correctness-runtime-contracts` — Runtime Contracts
 - [ ] `correctness-error-handling` — Error Handling
 - [ ] `correctness-failure-diagnostics` — Failure Diagnostics
 - [ ] `correctness-data-integrity-migrations` — Data Integrity & Migrations
