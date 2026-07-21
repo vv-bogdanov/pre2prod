@@ -33,13 +33,31 @@ describe("prepareGit", () => {
 
     await writeFile(resolve(cwd, "app.txt"), "after\n", "utf8");
     await writeFile(resolve(cwd, "PRE2PROD_PLAN.md"), "# Plan\n", "utf8");
-    await session.commitWorker("testing", 1);
+    await session.commitPhase({ id: "testing", title: "Testing" });
 
     expect((await git(cwd, ["log", "-1", "--pretty=%s"])).trim()).toBe(
-      "pre2prod(testing): iteration 1",
+      "pre2prod(testing): Testing",
     );
     expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe("?? PRE2PROD_PLAN.md");
     expect(await readFile(resolve(cwd, "app.txt"), "utf8")).toBe("after\n");
+  });
+
+  it("requires git repository and prints git init hint", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-git-"));
+
+    await expect(prepareGit(cwd, silentReporter())).rejects.toThrow(
+      /Git repository not detected\.[\s\S]*git init/,
+    );
+  });
+
+  it("fails with dirty tree", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-git-"));
+    await git(cwd, ["init"]);
+    await writeFile(resolve(cwd, "app.txt"), "before\n", "utf8");
+
+    await expect(prepareGit(cwd, silentReporter())).rejects.toThrow(
+      /Git working tree is not clean/,
+    );
   });
 });
 

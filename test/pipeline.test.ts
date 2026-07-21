@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
@@ -18,6 +20,8 @@ import { PhaseFailedError } from "../src/core/errors.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
 import { REVIEW_RESULT_SCHEMA } from "../src/reviewer.js";
 
+const execFileAsync = promisify(execFile);
+
 const phase: Phase = {
   id: "testing",
   title: "Testing",
@@ -26,7 +30,7 @@ const phase: Phase = {
 
 describe("Pre2prodPipeline", () => {
   it("passes when blockers are empty", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: [], non_blockers: ["Optional docs improvement"] }),
@@ -45,7 +49,7 @@ describe("Pre2prodPipeline", () => {
   });
 
   it("does not trigger worker for non_blockers only", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: [], non_blockers: ["Optional docs improvement"] }),
@@ -65,7 +69,7 @@ describe("Pre2prodPipeline", () => {
   });
 
   it("triggers a worker when blockers exist", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: ["Missing a critical test"], non_blockers: [] }),
@@ -91,7 +95,7 @@ describe("Pre2prodPipeline", () => {
   });
 
   it("passes only blockers to worker prompts", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: ["Gap A", "Gap B"], non_blockers: ["Nice-to-have"] }),
@@ -107,9 +111,9 @@ describe("Pre2prodPipeline", () => {
       networkAccess: false,
     });
 
-    const workerPrompts = runtime.requests.filter((request) =>
-      request.threadId.startsWith("worker-"),
-    ).map((request) => request.prompt);
+    const workerPrompts = runtime.requests
+      .filter((request) => request.threadId.startsWith("worker-"))
+      .map((request) => request.prompt);
     expect(workerPrompts).toHaveLength(2);
     expect(workerPrompts.join("\n\n")).toContain("Gap A");
     expect(workerPrompts.join("\n\n")).toContain("Gap B");
@@ -117,7 +121,7 @@ describe("Pre2prodPipeline", () => {
   });
 
   it("includes outputSchema for reviewer turns and not for worker turns", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
@@ -133,9 +137,8 @@ describe("Pre2prodPipeline", () => {
       networkAccess: false,
     });
 
-    const reviewerReviewTurns = runtime.requests.filter((request) =>
-      request.threadId === "reviewer" &&
-      request.prompt.includes("Current phase"),
+    const reviewerReviewTurns = runtime.requests.filter(
+      (request) => request.threadId === "reviewer" && request.prompt.includes("Current phase"),
     );
     expect(reviewerReviewTurns).toHaveLength(2);
     for (const request of reviewerReviewTurns) {
@@ -151,7 +154,7 @@ describe("Pre2prodPipeline", () => {
   });
 
   it("reports malformed reviewer output explicitly", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       "not valid json",
@@ -164,7 +167,7 @@ describe("Pre2prodPipeline", () => {
   });
 
   it("keeps persistent reviewer and exact-turn fork behavior", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+    const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
@@ -185,8 +188,9 @@ describe("Pre2prodPipeline", () => {
     ]);
   });
 
-  it("stops after the iteration limit", async () => {
-    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+  it("does not commit while phase is failing max iterations", async () => {
+    const cwd = await createInitializedRepo();
+    const initialCommits = await countCommits(cwd);
     const runtime = new FakeRuntime(cwd, [
       "Repository summary",
       JSON.stringify({ blockers: ["Gap 1"], non_blockers: [] }),
@@ -199,6 +203,28 @@ describe("Pre2prodPipeline", () => {
     await expect(
       pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
     ).rejects.toBeInstanceOf(PhaseFailedError);
+    expect(await countCommits(cwd)).toBe(initialCommits);
+  });
+
+  it("commits after successful phase with phase title", async () => {
+    const cwd = await createInitializedRepo();
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+      "Plan written",
+      "Plan executed",
+      JSON.stringify({ blockers: [], non_blockers: [] }),
+    ]);
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await pipeline.run({
+      cwd,
+      maxIterationsPerPhase: 2,
+      networkAccess: false,
+    });
+
+    const lastCommitMessage = await readLastCommitMessage(cwd);
+    expect(lastCommitMessage).toBe("pre2prod(testing): Testing");
   });
 });
 
@@ -254,6 +280,11 @@ class FakeRuntime implements AgentRuntime {
         "# Test plan\n",
         "utf8",
       );
+      await writeFile(
+        resolve(this.#cwd, "mock-fixed.txt"),
+        "fixed\n",
+        "utf8",
+      );
     }
     return { turnId: `turn-${++this.#turn}`, status: "completed", text };
   }
@@ -306,4 +337,40 @@ function silentReporter(): ProgressReporter {
     completed() {},
     failed() {},
   };
+}
+
+async function createInitializedRepo(): Promise<string> {
+  const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
+  await createBaseCommit(cwd);
+  return cwd;
+}
+
+async function execGit(cwd: string, args: string[]): Promise<string> {
+  const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
+  return result.stdout;
+}
+
+async function createBaseCommit(cwd: string): Promise<void> {
+  await execGit(cwd, ["init"]);
+  await writeFile(resolve(cwd, "base.txt"), "base\n", "utf8");
+  await execGit(cwd, ["add", "base.txt"]);
+  await execGit(cwd, [
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "initial",
+  ]);
+}
+
+async function countCommits(cwd: string): Promise<number> {
+  const count = await execGit(cwd, ["rev-list", "--count", "HEAD"]);
+  return Number.parseInt(count.trim(), 10);
+}
+
+async function readLastCommitMessage(cwd: string): Promise<string> {
+  const value = await execGit(cwd, ["log", "-1", "--pretty=%s"]);
+  return value.trim();
 }
