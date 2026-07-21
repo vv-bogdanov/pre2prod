@@ -77,6 +77,7 @@ program
       options.observe || options.verbose,
     );
     const runId = createRunId();
+    const logDirectory = resolve(cwd, options.logDir);
     const logger = new FileRunLogger({
       cwd,
       runId,
@@ -101,6 +102,13 @@ program
         return;
       }
 
+      reporter.info(`Run: ${runId} · logs: ${logDirectory}`);
+      logger.log(
+        "info",
+        "cli.run.started",
+        { cwd, logDir: logDirectory },
+        { summary: true },
+      );
       const providerLabel = formatRuntimeValue(
         runtimeConfig.provider,
         runtimeConfig.providerSource,

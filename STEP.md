@@ -19,6 +19,9 @@ art for its MVP scope.
       irrelevant product features.
 - [ ] Keep phase reports and the final report outside product commits unless a
       report becomes intentional repository documentation.
+- [ ] Store reports in `.pre2prod/reports/`; after reviewing a Worker plan,
+      preserve a copy there and remove `PRE2PROD_PLAN.md` from the repository
+      root before the next clean-start run.
 
 ## Preparation
 
