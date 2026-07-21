@@ -2,6 +2,7 @@ import type {
   AgentRuntime,
   ThreadGoal,
   ThreadGoalRequest,
+  ThreadGoalStatus,
   ProgressReporter,
   ThreadRef,
   TurnLogContext,
@@ -25,7 +26,6 @@ interface ThreadResponse {
 interface TurnStartResponse {
   turn: {
     id: string;
-    status: string;
   };
 }
 
@@ -115,16 +115,16 @@ export class AppServerRuntime implements AgentRuntime {
     model?: string;
   }): Promise<ThreadRef> {
     this.#assertInitialized();
-    const response = await this.#client.request<ThreadResponse>(
-      "thread/start",
-      {
+    const response = parseThreadResponse(
+      await this.#client.request<unknown>("thread/start", {
         cwd: options.cwd,
         model: options.model ?? this.#model,
         ...(this.#modelProvider ? { modelProvider: this.#modelProvider } : {}),
         approvalPolicy: "never",
         sandbox: "read-only",
         serviceName: "pre2prod",
-      },
+      }),
+      "thread/start",
     );
     this.#logger?.log("debug", "runtime.thread.start", {
       threadId: response.thread.id,
@@ -145,13 +145,16 @@ export class AppServerRuntime implements AgentRuntime {
     lastTurnId: string,
   ): Promise<ThreadRef> {
     this.#assertInitialized();
-    const response = await this.#client.request<ThreadResponse>("thread/fork", {
-      threadId,
-      lastTurnId,
-      // App Server goals are unavailable on ephemeral threads. The pipeline
-      // still treats this worker as disposable and never resumes it.
-      ephemeral: false,
-    });
+    const response = parseThreadResponse(
+      await this.#client.request<unknown>("thread/fork", {
+        threadId,
+        lastTurnId,
+        // App Server goals are unavailable on ephemeral threads. The pipeline
+        // still treats this worker as disposable and never resumes it.
+        ephemeral: false,
+      }),
+      "thread/fork",
+    );
     this.#logger?.log("debug", "runtime.thread.fork", {
       parentThreadId: threadId,
       sourceTurnId: lastTurnId,
@@ -169,9 +172,8 @@ export class AppServerRuntime implements AgentRuntime {
     this.#assertInitialized();
     const logContext = request.logContext;
 
-    const response = await this.#client.request<TurnStartResponse>(
-      "turn/start",
-      {
+    const response = parseTurnStartResponse(
+      await this.#client.request<unknown>("turn/start", {
         threadId: request.threadId,
         input: [{ type: "text", text: request.prompt }],
         cwd: request.cwd,
@@ -188,7 +190,8 @@ export class AppServerRuntime implements AgentRuntime {
               },
         model: this.#model,
         ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
-      },
+      }),
+      "turn/start",
     );
     this.#logger?.log("info", "runtime.turn.started", {
       turnId: response.turn.id,
@@ -234,16 +237,16 @@ export class AppServerRuntime implements AgentRuntime {
       objective: goal.objective,
       status: goal.status,
     });
-    const response = await this.#client.request<ThreadGoalResponse>(
-      "thread/goal/set",
-      {
+    const response = parseThreadGoalResponse(
+      await this.#client.request<unknown>("thread/goal/set", {
         threadId,
         ...(goal.objective !== undefined ? { objective: goal.objective } : {}),
         ...(goal.status !== undefined ? { status: goal.status } : {}),
         ...(goal.tokenBudget !== undefined
           ? { tokenBudget: goal.tokenBudget }
           : {}),
-      },
+      }),
+      "thread/goal/set",
     );
     return response.goal;
   }
@@ -251,9 +254,9 @@ export class AppServerRuntime implements AgentRuntime {
   public async getThreadGoal(threadId: string): Promise<ThreadGoal | null> {
     this.#assertInitialized();
     this.#logger?.log("debug", "runtime.goal.get", { threadId });
-    const response = await this.#client.request<ThreadGoalGetResponse>(
+    const response = parseThreadGoalGetResponse(
+      await this.#client.request<unknown>("thread/goal/get", { threadId }),
       "thread/goal/get",
-      { threadId },
     );
     return response.goal;
   }
@@ -261,9 +264,9 @@ export class AppServerRuntime implements AgentRuntime {
   public async clearThreadGoal(threadId: string): Promise<boolean> {
     this.#assertInitialized();
     this.#logger?.log("debug", "runtime.goal.clear", { threadId });
-    const response = await this.#client.request<ThreadGoalClearResponse>(
+    const response = parseThreadGoalClearResponse(
+      await this.#client.request<unknown>("thread/goal/clear", { threadId }),
       "thread/goal/clear",
-      { threadId },
     );
     return response.cleared;
   }
@@ -709,6 +712,139 @@ function getErrorMessage(value: unknown): string | undefined {
   return isRecord(value) && typeof value.message === "string"
     ? value.message
     : undefined;
+}
+
+function parseThreadResponse(value: unknown, method: string): ThreadResponse {
+  if (!isRecord(value) || !isRecord(value.thread)) {
+    throw invalidResponse(method);
+  }
+
+  const id = nonEmptyString(value.thread.id);
+  const rawSessionId = value.thread.sessionId;
+  const sessionId =
+    rawSessionId === undefined ? undefined : nonEmptyString(rawSessionId);
+  if (!id || (rawSessionId !== undefined && !sessionId)) {
+    throw invalidResponse(method);
+  }
+
+  return {
+    thread: {
+      id,
+      ...(sessionId ? { sessionId } : {}),
+    },
+  };
+}
+
+function parseTurnStartResponse(
+  value: unknown,
+  method: string,
+): TurnStartResponse {
+  if (!isRecord(value) || !isRecord(value.turn)) {
+    throw invalidResponse(method);
+  }
+
+  const id = nonEmptyString(value.turn.id);
+  if (!id) {
+    throw invalidResponse(method);
+  }
+
+  return { turn: { id } };
+}
+
+function parseThreadGoalResponse(
+  value: unknown,
+  method: string,
+): ThreadGoalResponse {
+  if (!isRecord(value)) {
+    throw invalidResponse(method);
+  }
+  const goal = parseThreadGoal(value.goal);
+  if (!goal) {
+    throw invalidResponse(method);
+  }
+  return { goal };
+}
+
+function parseThreadGoalGetResponse(
+  value: unknown,
+  method: string,
+): ThreadGoalGetResponse {
+  if (!isRecord(value) || !("goal" in value)) {
+    throw invalidResponse(method);
+  }
+  if (value.goal === null) {
+    return { goal: null };
+  }
+  const goal = parseThreadGoal(value.goal);
+  if (!goal) {
+    throw invalidResponse(method);
+  }
+  return { goal };
+}
+
+function parseThreadGoalClearResponse(
+  value: unknown,
+  method: string,
+): ThreadGoalClearResponse {
+  if (!isRecord(value) || typeof value.cleared !== "boolean") {
+    throw invalidResponse(method);
+  }
+  return { cleared: value.cleared };
+}
+
+function parseThreadGoal(value: unknown): ThreadGoal | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const threadId = nonEmptyString(value.threadId);
+  const objective = nonEmptyString(value.objective);
+  const status = isThreadGoalStatus(value.status) ? value.status : undefined;
+  const tokenBudget = value.tokenBudget;
+  if (
+    !threadId ||
+    !objective ||
+    !status ||
+    (tokenBudget !== null && !isFiniteNumber(tokenBudget)) ||
+    !isFiniteNumber(value.tokensUsed) ||
+    !isFiniteNumber(value.timeUsedSeconds) ||
+    !isFiniteNumber(value.createdAt) ||
+    !isFiniteNumber(value.updatedAt)
+  ) {
+    return undefined;
+  }
+  return {
+    threadId,
+    objective,
+    status,
+    tokenBudget,
+    tokensUsed: value.tokensUsed,
+    timeUsedSeconds: value.timeUsedSeconds,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+  };
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isThreadGoalStatus(value: unknown): value is ThreadGoalStatus {
+  return (
+    value === "active" ||
+    value === "paused" ||
+    value === "blocked" ||
+    value === "complete" ||
+    value === "budgetLimited" ||
+    value === "usageLimited"
+  );
+}
+
+function invalidResponse(method: string): ProtocolError {
+  return new ProtocolError(`Invalid result from App Server method "${method}"`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

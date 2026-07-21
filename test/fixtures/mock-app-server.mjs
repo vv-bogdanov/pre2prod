@@ -4,6 +4,7 @@ import { access, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const input = createInterface({ input: process.stdin });
+setInterval(() => {}, 1_000);
 let threadCounter = 0;
 let turnCounter = 0;
 const goals = new Map();
@@ -32,6 +33,10 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "thread/start") {
+    if (process.env.MOCK_MALFORMED_RESULT === "thread/start") {
+      send({ id: message.id, result: { thread: {} } });
+      return;
+    }
     if (
       process.env.MOCK_EXPECT_MODEL_PROVIDER &&
       message.params.modelProvider !== process.env.MOCK_EXPECT_MODEL_PROVIDER
@@ -52,6 +57,10 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "thread/fork") {
+    if (process.env.MOCK_MALFORMED_RESULT === "thread/fork") {
+      send({ id: message.id, result: { thread: {} } });
+      return;
+    }
     if (message.params?.ephemeral) {
       send({
         id: message.id,
@@ -78,6 +87,10 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "thread/goal/set") {
+    if (process.env.MOCK_MALFORMED_RESULT === "thread/goal/set") {
+      send({ id: message.id, result: { goal: {} } });
+      return;
+    }
     const params = message.params ?? {};
     const threadId = params.threadId;
     const previous = goals.get(threadId) ?? {
@@ -106,12 +119,20 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "thread/goal/get") {
+    if (process.env.MOCK_MALFORMED_RESULT === "thread/goal/get") {
+      send({ id: message.id, result: { goal: {} } });
+      return;
+    }
     const threadId = message.params?.threadId;
     send({ id: message.id, result: { goal: goals.get(threadId) ?? null } });
     return;
   }
 
   if (message.method === "thread/goal/clear") {
+    if (process.env.MOCK_MALFORMED_RESULT === "thread/goal/clear") {
+      send({ id: message.id, result: { cleared: "yes" } });
+      return;
+    }
     const threadId = message.params?.threadId;
     goals.delete(threadId);
     send({ id: message.id, result: { cleared: true } });
@@ -123,6 +144,10 @@ input.on("line", async (line) => {
   }
 
   if (message.method === "turn/start") {
+    if (process.env.MOCK_MALFORMED_RESULT === "turn/start") {
+      send({ id: message.id, result: { turn: {} } });
+      return;
+    }
     const sandboxPolicy = message.params?.sandboxPolicy;
     const isReadOnlySandbox =
       sandboxPolicy?.type === "readOnly" &&

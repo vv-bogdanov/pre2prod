@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { AppServerRuntime } from "../src/app-server/runtime.js";
+import { ProtocolError } from "../src/core/errors.js";
 import type { Phase, ProgressReporter } from "../src/core/types.js";
 import { Pre2prodPipeline } from "../src/pipeline.js";
 
@@ -20,6 +21,21 @@ const phase: Phase = {
   title: "Mock readiness",
   reviewerPrompt: "Require mock-fixed.txt to exist.",
 };
+
+const malformedGoalCalls: ReadonlyArray<
+  [string, (runtime: AppServerRuntime) => Promise<unknown>]
+> = [
+  [
+    "thread/goal/set",
+    (runtime) =>
+      runtime.setThreadGoal("thread-1", {
+        objective: "Work",
+        status: "active",
+      }),
+  ],
+  ["thread/goal/get", (runtime) => runtime.getThreadGoal("thread-1")],
+  ["thread/goal/clear", (runtime) => runtime.clearThreadGoal("thread-1")],
+];
 
 describe("Pre2prodPipeline with App Server transport", () => {
   it("completes worker execution when the goal finishes before turn completion", async () => {
@@ -55,7 +71,87 @@ describe("Pre2prodPipeline with App Server transport", () => {
       "fixed\n",
     );
   });
+
+  it("rejects malformed thread/start results", async () => {
+    const runtime = malformedResultRuntime("thread/start");
+    await runtime.initialize();
+    try {
+      await expectInvalidResponse(
+        runtime.startThread({ cwd: process.cwd() }),
+        "thread/start",
+      );
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it("rejects malformed thread/fork results", async () => {
+    const runtime = malformedResultRuntime("thread/fork");
+    await runtime.initialize();
+    try {
+      await expectInvalidResponse(
+        runtime.forkThread("thread-1", "turn-1"),
+        "thread/fork",
+      );
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it("rejects malformed turn/start results", async () => {
+    const runtime = malformedResultRuntime("turn/start");
+    await runtime.initialize();
+    try {
+      await expectInvalidResponse(
+        runtime.runTurn({
+          threadId: "thread-1",
+          prompt: "Review the repository.",
+          cwd: process.cwd(),
+          sandbox: "read-only",
+        }),
+        "turn/start",
+      );
+    } finally {
+      await runtime.close();
+    }
+  });
+
+  it.each(malformedGoalCalls)(
+    "rejects malformed %s results",
+    async (method, call) => {
+      const runtime = malformedResultRuntime(method);
+      await runtime.initialize();
+      try {
+        await expectInvalidResponse(call(runtime), method);
+      } finally {
+        await runtime.close();
+      }
+    },
+  );
 });
+
+function malformedResultRuntime(method: string): AppServerRuntime {
+  return new AppServerRuntime({
+    command: process.execPath,
+    args: [mockServer],
+    env: { ...process.env, MOCK_MALFORMED_RESULT: method },
+  });
+}
+
+async function expectInvalidResponse(
+  promise: Promise<unknown>,
+  method: string,
+): Promise<void> {
+  try {
+    await promise;
+    throw new Error(`Expected ${method} to reject`);
+  } catch (error) {
+    expect(error).toBeInstanceOf(ProtocolError);
+    expect(error).toMatchObject({
+      message: `Invalid result from App Server method "${method}"`,
+    });
+  }
+}
 
 function silentReporter(): ProgressReporter {
   return {
