@@ -109,10 +109,10 @@ pre2prod --list -p testing,security -x security
 pre2prod --list
 
 Foundation
-  1. foundation-immediate-risk-triage — Immediate Risk Triage
-  2. foundation-reproducible-local-run — Reproducible Local Run
-  3. foundation-core-scope-critical-journeys — Core Scope & Critical Journeys
-  4. foundation-critical-smoke-baseline — Critical Smoke Baseline
+  Immediate Risk Triage        foundation-immediate-risk-triage
+  Reproducible Local Run      foundation-reproducible-local-run
+  Core Scope & Critical Journeys foundation-core-scope-critical-journeys
+  Critical Smoke Baseline      foundation-critical-smoke-baseline
 ```
 
 ## Development

@@ -89,16 +89,26 @@ export function formatPhaseList(
 
   const output: string[] = [];
 
+  let isFirstGroup = true;
   for (const [group, values] of groups) {
-    output.push(group);
-    const maxIdLength = Math.max(...values.map((phase) => phase.id.length));
+    if (!isFirstGroup) {
+      output.push("");
+    }
+    isFirstGroup = false;
 
-    values.forEach((phase, index) => {
-      const rawNumber = `${index + 1}.`;
-      const paddedId = `${phase.id}`.padEnd(maxIdLength);
+    output.push(group);
+    const displayTitles = values.map((phase) => {
       const displayTitle = stripGroupPrefix(phase.title, group);
-      const idCell = options.dimSlug ? pc.dim(paddedId) : paddedId;
-      output.push(`  ${rawNumber} ${idCell} — ${displayTitle}`);
+      return { phase, displayTitle };
+    });
+    const maxTitleLength = Math.max(
+      ...displayTitles.map(({ displayTitle }) => displayTitle.length),
+    );
+
+    displayTitles.forEach(({ phase, displayTitle }) => {
+      const paddedTitle = `${displayTitle}`.padEnd(maxTitleLength);
+      const idCell = options.dimSlug ? pc.dim(phase.id) : phase.id;
+      output.push(`  ${paddedTitle}   ${idCell}`);
     });
   }
 
