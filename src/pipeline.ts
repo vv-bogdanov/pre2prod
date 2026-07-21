@@ -1,5 +1,7 @@
 import { access, mkdir, readFile, rename, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 
 import type {
   AgentRuntime,
@@ -25,6 +27,7 @@ import { parseReviewResult, REVIEW_RESULT_SCHEMA } from "./reviewer.js";
 
 const PLAN_FILE = "PRE2PROD_PLAN.md";
 const TURN_WAIT_HEARTBEAT_MS = 10_000;
+const execFileAsync = promisify(execFile);
 
 export class Pre2prodPipeline {
   readonly #runtime: AgentRuntime;
@@ -383,6 +386,7 @@ export class Pre2prodPipeline {
         `${phase.title} worker planning (iteration ${phaseIteration})`,
       );
       await assertPlanExists(options.cwd);
+      await assertOnlyPlanChanged(options.cwd);
       this.#logger.log(
         "info",
         "phase.worker.planning.completed",
@@ -547,6 +551,25 @@ export class Pre2prodPipeline {
       phaseTurn: context.phaseTurn,
       isRepeat: context.isRepeat,
     };
+  }
+}
+
+async function assertOnlyPlanChanged(cwd: string): Promise<void> {
+  const result = await execFileAsync(
+    "git",
+    ["status", "--porcelain", "--untracked-files=all"],
+    { cwd, encoding: "utf8" },
+  );
+  const changedPaths = result.stdout
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => line.slice(3));
+  const unexpected = changedPaths.filter((path) => path !== PLAN_FILE);
+
+  if (unexpected.length > 0) {
+    throw new Pre2prodError(
+      `Planning turn modified files other than ${PLAN_FILE}: ${unexpected.join(", ")}`,
+    );
   }
 }
 

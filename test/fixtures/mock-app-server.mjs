@@ -135,6 +135,9 @@ input.on("line", async (line) => {
     }
     const threadId = message.params?.threadId;
     goals.delete(threadId);
+    if (process.env.MOCK_GOAL_CLEAR_MARKER) {
+      await writeFile(process.env.MOCK_GOAL_CLEAR_MARKER, "cleared\n", "utf8");
+    }
     send({ id: message.id, result: { cleared: true } });
     send({
       method: "thread/goal/cleared",
@@ -254,7 +257,7 @@ input.on("line", async (line) => {
       await writeFile(resolve(cwd, "mock-fixed.txt"), "fixed\n", "utf8");
       const goal = goals.get(message.params.threadId);
       if (goal) {
-        goal.status = "complete";
+        goal.status = process.env.MOCK_WORKER_GOAL_STATUS ?? "complete";
         goal.updatedAt = now();
         send({
           method: "thread/goal/updated",
@@ -292,11 +295,21 @@ input.on("line", async (line) => {
         },
       },
     });
+    const terminalStatus = prompt.includes("terminal turn")
+      ? process.env.MOCK_TURN_STATUS
+      : undefined;
     send({
       method: "turn/completed",
       params: {
         threadId: message.params.threadId,
-        turn: { id: turnId, status: "completed", items: [], error: null },
+        turn: {
+          id: turnId,
+          status: terminalStatus ?? "completed",
+          items: [],
+          error: terminalStatus
+            ? { message: `mock ${terminalStatus} turn` }
+            : null,
+        },
       },
     });
     return;

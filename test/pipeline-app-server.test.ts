@@ -122,6 +122,35 @@ describe("Pre2prodPipeline with App Server transport", () => {
     );
   });
 
+  it("clears a non-complete worker goal and does not commit the phase", async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-goal-failure-"));
+    await initBaseRepository(cwd);
+    const initialCommits = await countCommits(cwd);
+    const goalClearMarker = resolve(cwd, "goal-cleared.txt");
+    const runtime = new AppServerRuntime({
+      command: process.execPath,
+      args: [mockServer],
+      cwd,
+      env: {
+        ...process.env,
+        MOCK_WORKER_GOAL_STATUS: "blocked",
+        MOCK_GOAL_CLEAR_MARKER: goalClearMarker,
+      },
+    });
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await expect(
+      pipeline.run({
+        cwd,
+        maxIterationsPerPhase: 2,
+        networkAccess: false,
+      }),
+    ).rejects.toThrow(/Worker goal ended with status: blocked/);
+
+    expect(await readFile(goalClearMarker, "utf8")).toBe("cleared\n");
+    expect(await countCommits(cwd)).toBe(initialCommits);
+  });
+
   it("passes the local provider when starting a thread", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-provider-"));
     const runtime = new AppServerRuntime({
@@ -160,6 +189,11 @@ async function initBaseRepository(cwd: string): Promise<void> {
 async function execGit(cwd: string, args: string[]): Promise<string> {
   const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
   return result.stdout;
+}
+
+async function countCommits(cwd: string): Promise<number> {
+  const count = await execGit(cwd, ["rev-list", "--count", "HEAD"]);
+  return Number.parseInt(count.trim(), 10);
 }
 
 function silentReporter(): ProgressReporter {

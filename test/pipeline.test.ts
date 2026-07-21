@@ -193,6 +193,30 @@ describe("Pre2prodPipeline", () => {
     ).rejects.toThrow(/Reviewer response is not valid JSON/i);
   });
 
+  it("rejects planner changes outside PRE2PROD_PLAN.md before execution", async () => {
+    const cwd = await createInitializedRepo();
+    const initialCommits = await countCommits(cwd);
+    const runtime = new FakeRuntime(
+      cwd,
+      [
+        "Repository summary",
+        JSON.stringify({ blockers: ["Gap A"], non_blockers: [] }),
+        "Plan written",
+      ],
+      { planningExtraFile: "unexpected.txt" },
+    );
+    const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
+
+    await expect(
+      pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
+    ).rejects.toThrow(
+      /Planning turn modified files other than PRE2PROD_PLAN\.md: unexpected\.txt/,
+    );
+
+    expect(runtime.goals).toHaveLength(0);
+    expect(await countCommits(cwd)).toBe(initialCommits);
+  });
+
   it("keeps persistent reviewer and exact-turn fork behavior", async () => {
     const cwd = await createInitializedRepo();
     const runtime = new FakeRuntime(cwd, [
@@ -296,14 +320,20 @@ class FakeRuntime implements AgentRuntime {
   readonly #cwd: string;
   readonly #responses: string[];
   readonly #writePlan: boolean;
+  readonly #planningExtraFile: string | undefined;
   #turn = 0;
   #worker = 0;
   #goalStorage = new Map<string, ThreadGoal>();
 
-  public constructor(cwd: string, responses: string[], writePlan = true) {
+  public constructor(
+    cwd: string,
+    responses: string[],
+    options: { writePlan?: boolean; planningExtraFile?: string } = {},
+  ) {
     this.#cwd = cwd;
     this.#responses = [...responses];
-    this.#writePlan = writePlan;
+    this.#writePlan = options.writePlan ?? true;
+    this.#planningExtraFile = options.planningExtraFile;
   }
 
   public async initialize(): Promise<void> {}
@@ -337,6 +367,17 @@ class FakeRuntime implements AgentRuntime {
         "# Test plan\n",
         "utf8",
       );
+      if (this.#planningExtraFile) {
+        await writeFile(
+          resolve(this.#cwd, this.#planningExtraFile),
+          "unexpected\n",
+          "utf8",
+        );
+      }
+    }
+    if (
+      request.prompt.includes("read PRE2PROD_PLAN.md and execute it completely")
+    ) {
       await writeFile(resolve(this.#cwd, "mock-fixed.txt"), "fixed\n", "utf8");
     }
     return { turnId: `turn-${++this.#turn}`, status: "completed", text };

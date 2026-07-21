@@ -38,6 +38,46 @@ const malformedGoalCalls: ReadonlyArray<
 ];
 
 describe("Pre2prodPipeline with App Server transport", () => {
+  it.each(["failed", "interrupted"])(
+    "rejects a terminal %s turn and cleans up its collector",
+    async (status) => {
+      const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-terminal-turn-"));
+      const runtime = new AppServerRuntime({
+        command: process.execPath,
+        args: [mockServer],
+        cwd,
+        env: { ...process.env, MOCK_TURN_STATUS: status },
+      });
+
+      try {
+        await runtime.initialize();
+        const thread = await runtime.startThread({ cwd });
+        await expect(
+          runtime.runTurn({
+            threadId: thread.id,
+            prompt: "terminal turn",
+            cwd,
+            sandbox: "read-only",
+          }),
+        ).rejects.toThrow(`mock ${status} turn`);
+
+        await expect(
+          runtime.runTurn({
+            threadId: thread.id,
+            prompt: "normal turn",
+            cwd,
+            sandbox: "read-only",
+          }),
+        ).resolves.toMatchObject({
+          status: "completed",
+          text: "Repository studied.",
+        });
+      } finally {
+        await runtime.close();
+      }
+    },
+  );
+
   it("completes worker execution when the goal finishes before turn completion", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-e2e-"));
     await initBaseRepository(cwd);
