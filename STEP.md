@@ -28,12 +28,12 @@ art for its MVP scope.
 
 ## Preparation
 
-- [ ] Create and switch to the dedicated flight branch.
-- [ ] Confirm a clean working tree and record the baseline commit.
-- [ ] Run `pnpm run check`.
-- [ ] Run `pnpm run build`.
-- [ ] Confirm the phase list with `pre2prod --list`.
-- [ ] Prepare a report entry for each phase with: phase, slug, run ID, model,
+- [x] Create and switch to the dedicated flight branch.
+- [x] Confirm a clean working tree and record the baseline commit.
+- [x] Run `pnpm run check`.
+- [x] Run `pnpm run build`.
+- [x] Confirm the phase list with `pre2prod --list`.
+- [x] Prepare a report entry for each phase with: phase, slug, run ID, model,
       outcome, reviewer findings, Worker actions, changed files, validation,
       tool issues, recommendations, and commit decision.
 
