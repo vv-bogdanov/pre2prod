@@ -80,6 +80,7 @@ Options:
   --model <model>             Codex model (defaults to Codex CLI setting)
   --local-provider <provider> run Codex with a local provider (ollama or lmstudio)
   --max-iterations <n>        worker iterations per phase (default: 2)
+  --turn-timeout <minutes>    maximum App Server turn duration (default: 120)
   --no-network                disable network for worker execution turns
   --no-commit                 run in the current branch without checkpoint commits
   --codex-bin <path>          Codex executable
@@ -185,6 +186,8 @@ Tests include:
 - App Server JSON-RPC integration against a mock subprocess;
 - Git precondition and checkpoint commit behavior.
 
+Test-created temporary directories are isolated and removed after each suite.
+
 ## Run `pre2prod` from any project
 
 From the checked-out pre2prod repository:
@@ -212,7 +215,29 @@ node dist/cli.js --list -C /path/to/project
 - no destructive production operations;
 - no automatic stash/reset/clean;
 - dirty or missing Git exits with a clear error and instruction to run `git init`;
+- generated plans and default logs are added to the repository-local
+  `.git/info/exclude`, not the project's `.gitignore` or commits;
 - deployment readiness is prepared, not automatically promoted to production;
 - the resulting repository still requires human review before production use.
+
+## Data and privacy
+
+Pre2prod sends repository material, prompts, and tool context needed for each
+turn to the Codex or local model provider selected for the run. Provider-side
+processing and retention are governed by that provider's configuration and
+terms. Do not run Pre2prod on source or data you are not authorized to share
+with the selected provider.
+
+Pre2prod itself has no analytics or telemetry service. It writes redacted,
+bounded diagnostics locally under `.pre2prod/logs`; remove `.pre2prod` when
+those local run artifacts are no longer needed. `--no-network` disables network
+access for Worker execution tools, but it does not replace the model-provider
+connection required by Codex App Server.
+
+## Security
+
+Please report suspected vulnerabilities privately as described in
+[`SECURITY.md`](SECURITY.md). Do not include credentials, private source, or
+other sensitive data in a public issue.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PREPROD_SPEC_RU.md`](docs/PREPROD_SPEC_RU.md), and [`HANDOFF.md`](HANDOFF.md).

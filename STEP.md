@@ -106,14 +106,14 @@ a consolidated report and recommendations for the CLI's MVP scope.
 ### Operations
 
 - [x] `operations-observability` — Observability
-- [ ] `operations-reliability-operability` — Reliability & Operability
-- [ ] `operations-performance-resource-efficiency` — Performance & Resource Efficiency
+- [x] `operations-reliability-operability` — Reliability & Operability
+- [x] `operations-performance-resource-efficiency` — Performance & Resource Efficiency
 
 ### Assurance
 
-- [ ] `assurance-application-security-hardening` — Application Security Hardening
-- [ ] `assurance-privacy-sensitive-data` — Privacy & Sensitive Data
-- [ ] `assurance-legal-compliance-readiness` — Legal & Compliance Readiness
+- [x] `assurance-application-security-hardening` — Application Security Hardening
+- [x] `assurance-privacy-sensitive-data` — Privacy & Sensitive Data
+- [x] `assurance-legal-compliance-readiness` — Legal & Compliance Readiness
 
 ### Delivery
 

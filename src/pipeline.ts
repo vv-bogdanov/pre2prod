@@ -139,7 +139,8 @@ export class Pre2prodPipeline {
           phases.length,
           options,
           commit
-            ? (phaseToCommit) => git.commitPhase(phaseToCommit, options.signal)
+            ? (phaseToCommit, outcome) =>
+                git.commitPhase(phaseToCommit, outcome, options.signal)
             : () => Promise.resolve(),
         );
         summaries.push(summary);
@@ -190,7 +191,7 @@ export class Pre2prodPipeline {
         id: string;
         title: string;
       },
-      signal?: AbortSignal,
+      outcome?: "passed" | "blocked",
     ) => Promise<void>,
   ): Promise<PhaseSummary> {
     throwIfAborted(options.signal);
@@ -297,7 +298,7 @@ export class Pre2prodPipeline {
           options.signal,
         );
         throwIfAborted(options.signal);
-        await commitPhase(phase, options.signal);
+        await commitPhase(phase, "passed");
         throwIfAborted(options.signal);
         this.#reporter.phasePassed();
         this.#logger.log(
@@ -335,17 +336,6 @@ export class Pre2prodPipeline {
       );
 
       if (iteration >= options.maxIterationsPerPhase) {
-        this.#logger.log(
-          "error",
-          "phase.review.max_iterations_reached",
-          {
-            ...phaseContext,
-            phaseIteration,
-            blockersCount: review.blockers.length,
-            maxIterationsPerPhase: options.maxIterationsPerPhase,
-          },
-          { summary: true },
-        );
         const message = `Phase "${phase.title}" remains blocked after ${options.maxIterationsPerPhase} worker iterations; continuing to the next phase.`;
         this.#reporter.warning(message);
         this.#logger.log(
@@ -356,6 +346,28 @@ export class Pre2prodPipeline {
             phaseIteration,
             blockersCount: review.blockers.length,
             maxIterationsPerPhase: options.maxIterationsPerPhase,
+          },
+          { summary: true },
+        );
+        if (options.commit ?? true) {
+          await archivePlan(
+            options.cwd,
+            runId,
+            phase,
+            phaseIteration,
+            options.signal,
+          );
+          throwIfAborted(options.signal);
+          await commitPhase(phase, "blocked");
+          throwIfAborted(options.signal);
+        }
+        this.#logger.log(
+          "info",
+          "pipeline.phase.completed",
+          {
+            ...phaseContext,
+            phaseIteration,
+            passed: false,
           },
           { summary: true },
         );

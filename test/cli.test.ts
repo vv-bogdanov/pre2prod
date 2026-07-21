@@ -38,6 +38,7 @@ describe("pre2prod CLI", () => {
     expect(help.exitCode).toBe(0);
     expect(help.stdout).toContain("Usage: pre2prod");
     expect(help.stdout).toContain("--list");
+    expect(help.stdout).toContain("--turn-timeout");
     expect(version).toEqual({
       exitCode: 0,
       stdout: `${await packageVersion()}\n`,
@@ -61,6 +62,7 @@ describe("pre2prod CLI", () => {
       /--phases references unknown phase id\(s\): not-a-phase/,
     ],
     [["--list", "--max-iterations", "nope"], /Expected a non-negative integer/],
+    [["--list", "--turn-timeout", "0"], /Expected a positive number/],
   ])("rejects invalid arguments: %j", async (args, expected) => {
     const result = await runCli(...args);
 

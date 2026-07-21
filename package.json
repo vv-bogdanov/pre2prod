@@ -19,6 +19,7 @@
     "bin",
     "resources",
     "README.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "engines": {

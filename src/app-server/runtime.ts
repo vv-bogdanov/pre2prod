@@ -62,7 +62,7 @@ export interface AppServerRuntimeOptions extends JsonRpcClientOptions {
   turnTimeoutMs?: number;
 }
 
-const DEFAULT_TURN_TIMEOUT_MS = 30 * 60_000;
+export const DEFAULT_TURN_TIMEOUT_MS = 120 * 60_000;
 
 export class AppServerRuntime implements AgentRuntime {
   readonly #client: JsonRpcProcessClient;

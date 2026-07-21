@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
@@ -38,10 +38,42 @@ describe("prepareGit", () => {
     expect((await git(cwd, ["log", "-1", "--pretty=%s"])).trim()).toBe(
       "pre2prod(testing): Testing",
     );
-    expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe(
-      "?? PRE2PROD_PLAN.md",
+    expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe("");
+    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toBe(
+      "# Plan\n",
     );
     expect(await readFile(resolve(cwd, "app.txt"), "utf8")).toBe("after\n");
+  });
+
+  it("keeps generated runtime artifacts out of status and checkpoints", async () => {
+    const cwd = await createInitializedRepository();
+    await mkdir(resolve(cwd, ".pre2prod", "logs"), { recursive: true });
+    await writeFile(
+      resolve(cwd, ".pre2prod", "logs", "events.jsonl"),
+      "{}\n",
+      "utf8",
+    );
+
+    const session = await prepareGit(cwd, silentReporter());
+    await writeFile(resolve(cwd, "app.txt"), "after\n", "utf8");
+    await session.commitPhase({ id: "testing", title: "Testing" });
+
+    expect((await git(cwd, ["status", "--porcelain"])).trim()).toBe("");
+    expect(
+      (await git(cwd, ["show", "--name-only", "--pretty=", "HEAD"])).trim(),
+    ).toBe("app.txt");
+  });
+
+  it("marks unresolved phase checkpoints as blocked", async () => {
+    const cwd = await createInitializedRepository();
+    const session = await prepareGit(cwd, silentReporter());
+    await writeFile(resolve(cwd, "app.txt"), "unresolved\n", "utf8");
+
+    await session.commitPhase({ id: "testing", title: "Testing" }, "blocked");
+
+    expect((await git(cwd, ["log", "-1", "--pretty=%s"])).trim()).toBe(
+      "pre2prod(testing): Testing (blocked)",
+    );
   });
 
   it("requires git repository and prints git init hint", async () => {
@@ -59,6 +91,18 @@ describe("prepareGit", () => {
 
     await expect(prepareGit(cwd, silentReporter())).rejects.toThrow(
       /Git working tree is not clean/,
+    );
+  });
+
+  it("does not delete a pre-existing root plan during preparation", async () => {
+    const cwd = await createInitializedRepository();
+    await writeFile(resolve(cwd, "PRE2PROD_PLAN.md"), "user plan\n", "utf8");
+
+    await expect(prepareGit(cwd, silentReporter())).rejects.toThrow(
+      /Git working tree is not clean/,
+    );
+    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toBe(
+      "user plan\n",
     );
   });
 

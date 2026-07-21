@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { Pre2prodError, throwIfAborted } from "./core/errors.js";
@@ -6,12 +8,18 @@ import type { ProgressReporter } from "./core/types.js";
 
 const execFileAsync = promisify(execFile);
 const GIT_COMMAND_TIMEOUT_MS = 30_000;
+const RUNTIME_EXCLUDES = [
+  "/PRE2PROD_PLAN.md",
+  "/.pre2prod/logs/",
+  "/.pre2prod/plans/",
+] as const;
 
 export interface GitSession {
   enabled: true;
   branch: string;
   commitPhase(
     phase: { id: string; title: string },
+    outcome?: "passed" | "blocked",
     signal?: AbortSignal,
   ): Promise<void>;
 }
@@ -39,6 +47,8 @@ ${GIT_COMMAND_HINT}`);
       "Git working tree is not clean. Commit or stash local changes before running pre2prod.",
     );
   }
+
+  await excludeRuntimeArtifacts(cwd);
 
   if (options.createBranch === false) {
     const branch = await currentBranch(cwd);
@@ -70,16 +80,28 @@ ${GIT_COMMAND_HINT}`);
   return {
     enabled: true,
     branch,
-    async commitPhase(phase, signal) {
+    async commitPhase(phase, outcome = "passed", signal) {
       throwIfAborted(signal);
       const slug = normalizePhaseIdentifier(phase);
       const safeTitle = normalizeCommitTitle(phase.title);
-      const message = `pre2prod(${slug}): ${safeTitle}`;
+      const suffix = outcome === "blocked" ? " (blocked)" : "";
+      const message = `pre2prod(${slug}): ${safeTitle}${suffix}`;
 
       try {
         await git(cwd, ["add", "-A"]);
         throwIfAborted(signal);
-        await git(cwd, ["reset", "-q", "--", "PRE2PROD_PLAN.md"], true);
+        await git(
+          cwd,
+          [
+            "reset",
+            "-q",
+            "--",
+            "PRE2PROD_PLAN.md",
+            ".pre2prod/logs",
+            ".pre2prod/plans",
+          ],
+          true,
+        );
         throwIfAborted(signal);
         const staged = await git(cwd, ["diff", "--cached", "--quiet"], true);
         if (staged.exitCode === 0) {
@@ -161,8 +183,35 @@ export async function workingTreeStatus(cwd: string): Promise<string> {
     "status",
     "--porcelain",
     "--untracked-files=all",
+    "--",
+    ".",
+    ":(exclude).pre2prod/logs/**",
+    ":(exclude).pre2prod/plans/**",
   ]);
   return result.stdout;
+}
+
+async function excludeRuntimeArtifacts(cwd: string): Promise<void> {
+  const gitPath = (
+    await git(cwd, ["rev-parse", "--git-path", "info/exclude"])
+  ).stdout.trim();
+  const excludePath = resolve(cwd, gitPath);
+  let existing = "";
+  try {
+    existing = await readFile(excludePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+  const lines = new Set(existing.split(/\r?\n/));
+  const missing = RUNTIME_EXCLUDES.filter((entry) => !lines.has(entry));
+  if (missing.length === 0) {
+    return;
+  }
+  await mkdir(dirname(excludePath), { recursive: true });
+  const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+  await appendFile(excludePath, `${prefix}${missing.join("\n")}\n`, "utf8");
 }
 
 function formatRunId(date: Date): string {

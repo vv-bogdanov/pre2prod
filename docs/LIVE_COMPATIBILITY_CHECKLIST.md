@@ -34,7 +34,8 @@ The automated suite validates orchestration against a protocol-faithful mock pro
 - [ ] Confirm `thread/goal/clear` endpoint shape.
 - [ ] Confirm `thread/goal/updated` notification shape.
 - [ ] Confirm `thread/goal/cleared` notification shape.
-- [ ] Confirm planning turn writes `PRE2PROD_PLAN.md`.
+- [ ] Confirm the planning turn is read-only, returns a non-empty plan, and the
+      CLI writes that response to `PRE2PROD_PLAN.md` before execution.
 - [ ] Confirm execution turn receives workspace-write and configured network access.
 - [ ] Confirm original Reviewer thread can continue after Worker completion.
 - [ ] Confirm Worker transcript is absent from Reviewer history.

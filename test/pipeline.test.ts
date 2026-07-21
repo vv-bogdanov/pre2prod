@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -86,8 +86,11 @@ describe("Pre2prodPipeline", () => {
     ).rejects.toThrow(/Pre2prod run interrupted/i);
 
     expect(await countCommits(cwd)).toBe(initialCommits);
+    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toBe(
+      "Plan written",
+    );
     expect(await execGit(cwd, ["status", "--porcelain"])).toContain(
-      "?? PRE2PROD_PLAN.md",
+      "?? mock-fixed.txt",
     );
   });
 
@@ -361,10 +364,15 @@ describe("Pre2prodPipeline", () => {
     });
 
     expect(runtime.goals).toHaveLength(2);
-    expect(await countCommits(cwd)).toBe(initialCommits);
-    expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toBe(
-      "Plan written",
-    );
+    expect(await countCommits(cwd)).toBe(initialCommits + 1);
+    const archivedPlans = await readdir(resolve(cwd, ".pre2prod", "plans"));
+    expect(archivedPlans).toHaveLength(1);
+    expect(
+      await readFile(
+        resolve(cwd, ".pre2prod", "plans", archivedPlans[0] ?? ""),
+        "utf8",
+      ),
+    ).toBe("Plan written");
   });
 
   it("keeps persistent reviewer and exact-turn fork behavior", async () => {
@@ -389,7 +397,7 @@ describe("Pre2prodPipeline", () => {
     ]);
   });
 
-  it("does not commit while phase remains blocked after max iterations", async () => {
+  it("checkpoints unresolved changes when a phase reaches max iterations", async () => {
     const cwd = await createInitializedRepo();
     const initialCommits = await countCommits(cwd);
     const runtime = new FakeRuntime(cwd, [
@@ -407,7 +415,16 @@ describe("Pre2prodPipeline", () => {
       networkAccess: false,
     });
     expect(result.phases[0]?.passed).toBe(false);
-    expect(await countCommits(cwd)).toBe(initialCommits);
+    expect(await countCommits(cwd)).toBe(initialCommits + 1);
+    expect(await readLastCommitMessage(cwd)).toBe(
+      "pre2prod(testing): Testing (blocked)",
+    );
+    expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe(
+      "fixed\n",
+    );
+    await expect(
+      readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8"),
+    ).rejects.toThrow();
   });
 
   it("commits after successful phase with phase title", async () => {

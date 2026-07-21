@@ -5,7 +5,10 @@ import process from "node:process";
 
 import { Command, InvalidArgumentError } from "commander";
 
-import { AppServerRuntime } from "./app-server/runtime.js";
+import {
+  AppServerRuntime,
+  DEFAULT_TURN_TIMEOUT_MS,
+} from "./app-server/runtime.js";
 import { loadPhases } from "./phases.js";
 import { Pre2prodPipeline } from "./pipeline.js";
 import { ConsoleProgressReporter } from "./progress.js";
@@ -41,6 +44,12 @@ program
     "Maximum worker iterations per phase",
     parseNonNegativeInteger,
     2,
+  )
+  .option(
+    "--turn-timeout <minutes>",
+    "Maximum duration of one App Server turn in minutes",
+    parsePositiveNumber,
+    DEFAULT_TURN_TIMEOUT_MS / 60_000,
   )
   .option("--no-network", "Disable network access for worker execution turns")
   .option("--no-commit", "Run in the current branch without checkpoint commits")
@@ -138,6 +147,7 @@ program
         reporter,
         logger,
         clientVersion: VERSION,
+        turnTimeoutMs: options.turnTimeout * 60_000,
       });
       const pipeline = new Pre2prodPipeline(
         runtime,
@@ -251,6 +261,7 @@ interface CliRunOptions {
   model?: string;
   localProvider?: string;
   maxIterations: number;
+  turnTimeout: number;
   network: boolean;
   logDir: string;
   codexBin: string;
@@ -413,6 +424,17 @@ function parseNonNegativeInteger(value: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) {
     throw new InvalidArgumentError("Expected a non-negative integer");
+  }
+  return parsed;
+}
+
+function parsePositiveNumber(value: string): number {
+  const parsed = Number(value);
+  const maximum = Math.floor(2_147_483_647 / 60_000);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > maximum) {
+    throw new InvalidArgumentError(
+      `Expected a positive number no greater than ${maximum}`,
+    );
   }
   return parsed;
 }
