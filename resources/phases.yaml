@@ -102,5 +102,5 @@
 "Delivery: Staging Verification": |
   Review the deployed staging environment when accessible, otherwise review the prepared verification procedure. Check smoke or critical E2E flows, migrations, health, headers, telemetry, and recovery or rollback. Missing credentials alone are not a blocker when preparation is complete.
 
-"Delivery: Documentation & Repository Presentation": |
+"Delivery: Documentation & Repository": |
   Review whether another person can understand, run, test, deploy, operate, and maintain the project. Check README, quick start, architecture, environment, testing, deployment, rollback, troubleshooting, security, limitations, license, contribution guidance, and badges backed by real checks.
