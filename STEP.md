@@ -11,17 +11,20 @@ art for its MVP scope.
 
 ## Rules
 
-- [ ] Keep `main` clean; run the campaign from one dedicated working branch.
-- [ ] Use `--no-commit` for every phase run.
-- [ ] Run one phase only; never continue automatically to the next phase.
-- [ ] Do not discard a Worker diff without an explicit decision after review.
-- [ ] Treat non-applicable phases as an evidence-based PASS, not a reason to add
-      irrelevant product features.
-- [ ] Keep phase reports and the final report outside product commits unless a
-      report becomes intentional repository documentation.
-- [ ] Store reports in `.pre2prod/reports/`; after reviewing a Worker plan,
-      preserve a copy there and remove `PRE2PROD_PLAN.md` from the repository
-      root before the next clean-start run.
+- Keep `main` clean; run the campaign from one dedicated working branch.
+- Use `--no-commit` for every phase run.
+- Run one phase only; never continue automatically to the next phase.
+- Wait for an agent turn to complete instead of polling its status. If a
+  progress check is necessary, perform it no more often than once every
+  30 minutes.
+- Do not discard a Worker diff without an explicit decision after review.
+- Treat non-applicable phases as an evidence-based PASS, not a reason to add
+  irrelevant product features.
+- Keep phase reports and the final report outside product commits unless a
+  report becomes intentional repository documentation.
+- Store reports in `.pre2prod/reports/`; after reviewing a Worker plan,
+  preserve a copy there and remove `PRE2PROD_PLAN.md` from the repository root
+  before the next clean-start run.
 
 ## Preparation
 
