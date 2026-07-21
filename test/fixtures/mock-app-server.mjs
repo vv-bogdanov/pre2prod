@@ -125,10 +125,10 @@ input.on("line", async (line) => {
         .then(() => true)
         .catch(() => false);
       text = fixed
-        ? JSON.stringify({ status: "PASS", findings: [] })
+        ? JSON.stringify({ blockers: [], non_blockers: [] })
         : JSON.stringify({
-            status: "NEEDS_WORK",
-            findings: ["Create mock-fixed.txt"],
+            blockers: ["Create mock-fixed.txt"],
+            non_blockers: [],
           });
     }
 
