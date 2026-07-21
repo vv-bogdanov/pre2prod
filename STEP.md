@@ -75,7 +75,7 @@ art for its MVP scope.
 
 ### Correctness
 
-- [ ] `correctness-type-safety` — Type Safety
+- [x] `correctness-type-safety` — Type Safety
 - [ ] `correctness-runtime-contracts` — Runtime Contracts
 - [ ] `correctness-error-handling` — Error Handling
 - [ ] `correctness-failure-diagnostics` — Failure Diagnostics
