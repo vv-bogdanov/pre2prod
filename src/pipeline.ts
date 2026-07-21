@@ -67,7 +67,7 @@ export class Pre2prodPipeline {
           reviewer.id,
           phase,
           options,
-          (phaseId, iteration) => git.commitWorker(phaseId, iteration),
+          (phaseToCommit) => git.commitPhase(phaseToCommit),
         );
         summaries.push(summary);
       }
@@ -88,7 +88,7 @@ export class Pre2prodPipeline {
     reviewerThreadId: string,
     phase: Phase,
     options: PipelineOptions,
-    commitWorker: (phaseId: string, iteration: number) => Promise<void>,
+    commitPhase: (phaseToCommit: { id: string; title: string }) => Promise<void>,
   ): Promise<PhaseSummary> {
     let isRepeat = false;
     let latestBlockers: string[] = [];
@@ -121,6 +121,7 @@ export class Pre2prodPipeline {
 
       if (review.blockers.length === 0) {
         this.#reporter.phasePassed();
+        await commitPhase(phase);
         return { phase, iterations: iteration, passed: true, findings: [] };
       }
 
@@ -176,7 +177,6 @@ export class Pre2prodPipeline {
         await this.#runtime.clearThreadGoal(worker.id);
       }
 
-      await commitWorker(phase.id, iteration + 1);
       isRepeat = true;
     }
 
