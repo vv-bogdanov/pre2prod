@@ -16,7 +16,7 @@ persistent Reviewer
 
 ## Status
 
-This is a hackathon MVP scaffold. The orchestration, App Server client, prompts, Git checkpoints, Codex Skill, mocks, and automated tests are implemented. Live compatibility still needs to be verified against the installed Codex CLI version.
+This is a hackathon MVP scaffold. The orchestration, App Server client, prompts, Git checkpoints, explicit-only Codex Skill at `.agents/skills/pre2prod/`, mocks, and automated tests are implemented. Live compatibility still needs to be verified against the installed Codex CLI version.
 
 ## Requirements
 
@@ -173,16 +173,10 @@ Current automated baseline:
 
 Tests include:
 
-- Reviewer structured-output and fallback parsing;
+- Reviewer structured-result parsing;
 - full pipeline state transitions with a fake runtime;
 - App Server JSON-RPC integration against a mock subprocess;
 - Git precondition and checkpoint commit behavior.
-
-## TODO
-
-- [ ] Create and package an explicit-only Codex skill at
-      `.agents/skills/pre2prod/`. It should launch the CLI without duplicating
-      the workflow.
 
 ## Run `pre2prod` from any project
 

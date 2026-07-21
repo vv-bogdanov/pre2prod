@@ -7,7 +7,7 @@ The starter implementation is complete and validated against a mock Codex App Se
 - TypeScript CLI with Commander;
 - one persistent Reviewer thread;
 - ordered readiness phases;
-- `PASS` / `NEEDS_WORK` structured Reviewer output;
+- structured Reviewer results with `blockers` and `non_blockers`;
 - Worker fork from the exact completed review turn;
 - planning turn that writes `PRE2PROD_PLAN.md`;
 - execution turn in the same Worker thread;
@@ -15,7 +15,7 @@ The starter implementation is complete and validated against a mock Codex App Se
 - finite per-phase iteration limit;
 - noninteractive approval policy;
 - required Git branch and checkpoint commits (run fails with `git init` instruction when repo is missing).
-- explicit-only Codex Skill;
+- explicit-only Codex Skill at `.agents/skills/pre2prod/` that delegates to the CLI;
 - unit, integration, JSONL protocol, Git, and full mock pipeline tests;
 - pnpm build and package validation.
 
