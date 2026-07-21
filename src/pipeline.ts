@@ -24,6 +24,7 @@ import { createRunId, NoopRunLogger, type RunLogger } from "./logging.js";
 import { parseReviewResult, REVIEW_RESULT_SCHEMA } from "./reviewer.js";
 
 const PLAN_FILE = "PRE2PROD_PLAN.md";
+const TURN_WAIT_HEARTBEAT_MS = 10_000;
 
 export class Pre2prodPipeline {
   readonly #runtime: AgentRuntime;
@@ -75,24 +76,28 @@ export class Pre2prodPipeline {
         runId,
         threadId: reviewer.id,
       });
-      await this.#runtime.runTurn({
+      const discoveryLogContext = {
+        runId,
+        phaseId: "discovery",
+        phaseIndex: 0,
+        phaseTitle: "discovery",
+        phaseIteration: 0,
+        phaseTotal: phases.length,
+        threadRole: "reviewer" as const,
+        phaseTurn: "review" as const,
+        isRepeat: false,
+      };
+
+      await this.#runTurnWithProgress(() => {
+        return this.#runtime.runTurn({
         threadId: reviewer.id,
         prompt: initialDiscoveryPrompt(options.instructions),
         cwd: options.cwd,
         sandbox: "read-only",
         outputSchema: REVIEW_RESULT_SCHEMA,
-        logContext: {
-          runId,
-          phaseId: "discovery",
-          phaseIndex: 0,
-          phaseTitle: "discovery",
-          phaseIteration: 0,
-          phaseTotal: phases.length,
-          threadRole: "reviewer",
-          phaseTurn: "review",
-          isRepeat: false,
-        },
+        logContext: discoveryLogContext,
       });
+      }, discoveryLogContext);
       this.#logger.log(
         "info",
         "pipeline.discovery.completed",
@@ -211,14 +216,18 @@ export class Pre2prodPipeline {
       let reviewTurn: TurnResult;
       let review: ReturnType<typeof parseReviewResult>;
       try {
-        reviewTurn = await this.#runtime.runTurn({
-          threadId: reviewerThreadId,
-          prompt: phaseReviewPrompt(phase, options.instructions, isRepeat),
-          cwd: options.cwd,
-          sandbox: "read-only",
-          outputSchema: REVIEW_RESULT_SCHEMA,
-          logContext: reviewLogContext,
-        });
+        reviewTurn = await this.#runTurnWithProgress(
+          () =>
+            this.#runtime.runTurn({
+              threadId: reviewerThreadId,
+              prompt: phaseReviewPrompt(phase, options.instructions, isRepeat),
+              cwd: options.cwd,
+              sandbox: "read-only",
+              outputSchema: REVIEW_RESULT_SCHEMA,
+              logContext: reviewLogContext,
+            }),
+          reviewLogContext,
+        );
         review = parseReviewResult(reviewTurn.text);
         latestBlockers = review.blockers;
 
@@ -353,18 +362,22 @@ export class Pre2prodPipeline {
           },
         );
 
-        await this.#runtime.runTurn({
-          threadId: worker.id,
-          prompt: workerPlanningPrompt(
-            phase,
-            review.blockers,
-            options.instructions,
-          ),
-          cwd: options.cwd,
-          sandbox: "workspace-write",
-          networkAccess: false,
-          logContext: planningContext,
-        });
+        await this.#runTurnWithProgress(
+          () =>
+            this.#runtime.runTurn({
+              threadId: worker.id,
+              prompt: workerPlanningPrompt(
+                phase,
+                review.blockers,
+                options.instructions,
+              ),
+              cwd: options.cwd,
+              sandbox: "workspace-write",
+              networkAccess: false,
+              logContext: planningContext,
+            }),
+          planningContext,
+        );
         await assertPlanExists(options.cwd);
         this.#logger.log(
           "info",
@@ -403,18 +416,22 @@ export class Pre2prodPipeline {
           },
           { summary: true },
         );
-        await this.#runtime.runTurn({
-          threadId: worker.id,
-          prompt: workerExecutionPrompt(
-            phase,
-            review.blockers,
-            options.instructions,
-          ),
-          cwd: options.cwd,
-          sandbox: "workspace-write",
-          networkAccess: options.networkAccess,
-          logContext: executionContext,
-        });
+        await this.#runTurnWithProgress(
+          () =>
+            this.#runtime.runTurn({
+              threadId: worker.id,
+              prompt: workerExecutionPrompt(
+                phase,
+                review.blockers,
+                options.instructions,
+              ),
+              cwd: options.cwd,
+              sandbox: "workspace-write",
+              networkAccess: options.networkAccess,
+              logContext: executionContext,
+            }),
+          executionContext,
+        );
         this.#logger.log(
           "info",
           "phase.worker.execution.completed",
@@ -499,6 +516,47 @@ export class Pre2prodPipeline {
 
   #workerExecutionGoalObjective(phase: Phase, iteration: number): string {
     return `${phase.title} worker execution (${formatIteration(iteration)})`;
+  }
+
+  async #runTurnWithProgress<T>(
+    runTurn: () => Promise<T>,
+    context: TurnLogContext,
+  ): Promise<T> {
+    const startedAt = Date.now();
+    this.#reporter.waiting(
+      `${context.threadRole}/${context.phaseTurn} started (phase ${context.phaseIndex}, iteration ${context.phaseIteration})`,
+    );
+
+    const timer = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      this.#reporter.waiting(
+        `${context.threadRole}/${context.phaseTurn} running (${elapsedSeconds}s)`,
+      );
+      this.#logger.log("debug", "pipeline.turn.waiting", {
+        ...this.#buildLogContext(context),
+        elapsedSeconds,
+      });
+    }, TURN_WAIT_HEARTBEAT_MS);
+
+    try {
+      return await runTurn();
+    } finally {
+      clearInterval(timer);
+    }
+  }
+
+  #buildLogContext(context: TurnLogContext): Record<string, unknown> {
+    return {
+      runId: context.runId,
+      phaseId: context.phaseId,
+      phaseIndex: context.phaseIndex,
+      phaseTitle: context.phaseTitle,
+      phaseIteration: context.phaseIteration,
+      phaseTotal: context.phaseTotal,
+      threadRole: context.threadRole,
+      phaseTurn: context.phaseTurn,
+      isRepeat: context.isRepeat,
+    };
   }
 }
 

@@ -25,7 +25,7 @@ program
   .version(VERSION)
   .argument("[instructions...]", "Additional free-form direction for the whole run")
   .option("-C, --cwd <path>", "Repository working directory", process.cwd())
-  .option("--model <model>", "Codex model", process.env.PRE2PROD_MODEL ?? "gpt-5.6")
+  .option("--model <model>", "Codex model")
   .option(
     "--max-iterations <number>",
     "Maximum worker iterations per phase",
@@ -79,7 +79,7 @@ program
         command: options.codexBin,
         args: ["app-server"],
         cwd,
-        model: options.model,
+        ...(options.model ? { model: options.model } : {}),
         reporter,
         logger,
         clientVersion: VERSION,
@@ -88,7 +88,7 @@ program
 
       await pipeline.run({
         cwd,
-        model: options.model,
+        ...(options.model ? { model: options.model } : {}),
         ...(additionalInstructions ? { instructions: additionalInstructions } : {}),
         maxIterationsPerPhase: options.maxIterations,
         networkAccess: options.network,
@@ -153,7 +153,7 @@ await program.parseAsync();
 
 interface CliRunOptions {
   cwd: string;
-  model: string;
+  model?: string;
   maxIterations: number;
   network: boolean;
   logDir: string;

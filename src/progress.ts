@@ -60,9 +60,13 @@ export class ConsoleProgressReporter implements ProgressReporter {
     context?: Record<string, unknown>,
   ): void {
     void context;
-    if (this.#verboseEnabled) {
-      console.log(pc.dim(`      command [${status ?? "unknown"}] ${command}`));
-    }
+    console.log(
+      pc.dim(`      command [${status ?? "unknown"}] ${this.#verboseEnabled ? command : command.slice(0, 220)}`),
+    );
+  }
+
+  public waiting(message: string): void {
+    console.log(pc.dim(`      ${message}`));
   }
 
   public verbose(message: string): void {
