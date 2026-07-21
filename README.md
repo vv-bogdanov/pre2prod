@@ -1,9 +1,9 @@
-# Pre2prod  💩→🍭
+# Pre2prod 💩→🍭
 
 From vibe-coded PoC to production-ready MVP.
 
->Thousands of new products are vibe-coded every day,
->but only a small fraction ever reach production.
+> Thousands of new products are vibe-coded every day,
+> but only a small fraction ever reach production.
 
 Pre2Prod closes that gap with a carefully designed,
 best-practice workflow that progressively restructures,
@@ -89,7 +89,7 @@ Options:
   -C, --cwd <path>            repository directory
   --model <model>             Codex model (defaults to Codex CLI setting)
   --local-provider <provider> run Codex with a local provider (ollama or lmstudio)
-  --max-iterations <n>        worker iterations per phase (default: 2)
+  --max-iterations <n>        worker iterations per phase (default: 3)
   --turn-timeout <minutes>    maximum App Server turn duration (default: 120)
   --no-network                disable network for worker execution turns
   --no-commit                 run in the current branch without checkpoint commits
@@ -131,6 +131,7 @@ diagnostics, so the terminal result remains the source of truth for that run.
 pre2prod logs [options]
 
 Options:
+  --stats                    Summarize runs and phases from the summary log
   --full                     Read full event log instead of summary log
   -r, --run-id <id>          Filter by run id (exact)
   -p, --phase-id <id>        Filter by phase id (substring)
@@ -175,6 +176,18 @@ Foundation
 # quick grep-like log checks
 pre2prod logs --event phase.review.blockers --phase-id architecture
 pre2prod logs --full --tag p=3/12 --run-id 2026-07-21-...
+
+# summarize run and phase outcomes
+pre2prod logs --stats
+pre2prod logs --stats --run-id 2026-07-21-...
+```
+
+Before a long run, `pre2prod doctor` checks the Node and Git prerequisites,
+Codex installation and authentication, and a structured read-only App Server
+turn using the selected provider and model:
+
+```bash
+pre2prod doctor -C .
 ```
 
 ## Development
@@ -256,6 +269,13 @@ bounded diagnostics locally under `.pre2prod/logs`; remove `.pre2prod` when
 those local run artifacts are no longer needed. `--no-network` disables network
 access for Worker execution tools, but it does not replace the model-provider
 connection required by Codex App Server.
+
+## TODO
+
+- Decide how Reviewer `non_blockers` should be retained or surfaced. They must
+  remain informational and must not be sent to the Worker.
+- Resume interrupted runs from the last safe phase or turn boundary without
+  replaying a Worker side effect whose completion is unknown.
 
 ## Security
 

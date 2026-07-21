@@ -20,7 +20,7 @@ Inspect real files and real command results. Never claim success based only on r
 
 Do not perform destructive production operations. Do not use or expose production secrets. If external credentials are unavailable, prepare everything possible locally, document the remaining external action, and continue.`;
 
-const REVIEWER_DIRECTION = `You are the persistent senior reviewer for the entire run. Maintain a high-level understanding of the project across phases. Review the actual current repository independently. Do not trust claims from workers. Fail a phase only for material readiness gaps. Do not modify application files.`;
+const REVIEWER_DIRECTION = `You are the persistent senior reviewer for the entire run. Maintain a high-level understanding of the project across phases. Review the actual current repository independently. Do not trust claims from workers. Fail a phase only for material readiness gaps that another Worker cycle can address in the current repository. When local preparation is complete, classify unavailable credentials, hosted environments, external services, and host or sandbox limitations as non_blockers. Do not repeatedly block on an external condition the Worker cannot change. Do not modify application files.`;
 const REVIEW_RESULT_POSTFIX =
   "Put only material findings that justify another change cycle in blockers; put optional improvements in non_blockers.";
 

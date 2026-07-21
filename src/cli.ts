@@ -14,6 +14,8 @@ import { Pre2prodPipeline } from "./pipeline.js";
 import { ConsoleProgressReporter } from "./progress.js";
 import { createRunId, FileRunLogger, redactSensitiveText } from "./logging.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
+import { buildLogStats, formatLogStats } from "./log-stats.js";
+import { runDoctor } from "./doctor.js";
 import {
   collectPhaseIds,
   formatPhaseList,
@@ -43,7 +45,7 @@ program
     "--max-iterations <number>",
     "Maximum worker iterations per phase",
     parseNonNegativeInteger,
-    2,
+    3,
   )
   .option(
     "--turn-timeout <minutes>",
@@ -205,6 +207,7 @@ program
   .option("-C, --cwd <path>", "Repository working directory", process.cwd())
   .option("--log-dir <path>", "Directory for run logs", ".pre2prod/logs")
   .option("--full", "Read full event log instead of summary log", false)
+  .option("--stats", "Summarize runs and phases from the summary log", false)
   .option("-r, --run-id <id>", "Filter by run id (exact)")
   .option("-p, --phase-id <id>", "Filter by phase id (substring)")
   .option(
@@ -236,6 +239,30 @@ program
     };
 
     try {
+      if (options.stats) {
+        const unsupported = selectedDetailedLogFilters(options);
+        if (options.full || unsupported.length > 0) {
+          console.error(
+            `--stats supports only --run-id and --phase-id${unsupported.length > 0 ? `; remove ${unsupported.join(", ")}` : "; remove --full"}`,
+          );
+          process.exitCode = 1;
+          return;
+        }
+        const content = await readFile(logPaths.summary, "utf8");
+        const stats = buildLogStats(content.split(/\r?\n/), {
+          ...(options.runId ? { runId: options.runId } : {}),
+          ...(options.phaseId ? { phaseId: options.phaseId } : {}),
+        });
+        if (stats.runs.total === 0 && stats.phases.length === 0) {
+          console.log("No matching log entries");
+          return;
+        }
+        for (const line of formatLogStats(stats)) {
+          console.log(line);
+        }
+        return;
+      }
+
       const output = await readLogFile(logPath, filters);
       if (!output.length) {
         console.log("No matching log entries");
@@ -251,6 +278,43 @@ program
         return;
       }
       throw error;
+    }
+  });
+
+program
+  .command("doctor")
+  .description("Check local prerequisites and Codex App Server compatibility")
+  .option("-C, --cwd <path>", "Repository working directory", process.cwd())
+  .option("--model <model>", "Codex model")
+  .option(
+    "--local-provider <provider>",
+    "Run Codex with a local provider (ollama or lmstudio)",
+  )
+  .option(
+    "--codex-bin <path>",
+    "Codex executable",
+    process.env.PRE2PROD_CODEX_BIN ?? "codex",
+  )
+  .action(async (options: CliDoctorOptions) => {
+    const cwd = resolve(options.cwd);
+    const runtimeConfig = resolveRuntimeConfig(options);
+    const result = await runDoctor({
+      cwd,
+      codexBin: options.codexBin,
+      codexArgs: runtimeConfig.codexArgs,
+      ...(runtimeConfig.model ? { model: runtimeConfig.model } : {}),
+      ...(runtimeConfig.provider ? { provider: runtimeConfig.provider } : {}),
+      clientVersion: VERSION,
+    });
+
+    console.log("Pre2prod doctor");
+    for (const check of result.checks) {
+      console.log(
+        `${check.passed ? "PASS" : "FAIL"}  ${check.name}: ${redactSensitiveText(check.detail)}`,
+      );
+    }
+    if (!result.passed) {
+      process.exitCode = 1;
     }
   });
 
@@ -277,6 +341,7 @@ interface CliLogOptions {
   cwd: string;
   logDir: string;
   full: boolean;
+  stats: boolean;
   runId: string | undefined;
   phaseId: string | undefined;
   iteration: number | undefined;
@@ -285,6 +350,13 @@ interface CliLogOptions {
   event: string | undefined;
   contains: string | undefined;
   tag: string | undefined;
+}
+
+interface CliDoctorOptions {
+  cwd: string;
+  model?: string;
+  localProvider?: string;
+  codexBin: string;
 }
 
 interface ParsedLogEvent {
@@ -407,6 +479,19 @@ function getInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value)
     ? value
     : undefined;
+}
+
+function selectedDetailedLogFilters(options: CliLogOptions): string[] {
+  return [
+    ["--iteration", options.iteration],
+    ["--role", options.role],
+    ["--turn", options.turn],
+    ["--event", options.event],
+    ["--contains", options.contains],
+    ["--tag", options.tag],
+  ]
+    .filter((entry) => entry[1] !== undefined)
+    .map((entry) => String(entry[0]));
 }
 
 function formatRuntimeValue(
