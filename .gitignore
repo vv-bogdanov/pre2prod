@@ -1,7 +1,6 @@
 /.idea/
 /dist/
+/coverage/
 /node_modules/
 /generated/
 /.pre2prod/
-.pre2prod/
-.pr2prod/

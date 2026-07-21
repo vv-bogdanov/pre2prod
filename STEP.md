@@ -50,6 +50,8 @@ art for its MVP scope.
 - [ ] Write the phase report and recommendations.
 - [ ] If the change is acceptable, archive or remove `PRE2PROD_PLAN.md` as
       appropriate and commit the reviewed change manually.
+- [ ] Rebuild the CLI with `pnpm run build` after every accepted phase and
+      before starting the next one.
 - [ ] If Pre2prod itself has a confirmed bug or harmful maintenance friction,
       fix it with focused tests, validate it, and rerun the same phase.
 - [ ] If the Worker change is not acceptable, stop and decide the next action

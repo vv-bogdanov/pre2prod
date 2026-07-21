@@ -18,7 +18,6 @@
     "dist",
     "bin",
     "resources",
-    ".agents/skills/pre2prod",
     "README.md",
     "LICENSE"
   ],
@@ -34,7 +33,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "pack:check": "pnpm pack --dry-run",
+    "pack:check": "pnpm pack --pack-destination .pre2prod/pack-check",
     "clean": "node scripts/clean.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

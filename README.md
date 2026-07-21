@@ -166,9 +166,8 @@ pnpm run pack:check
 
 Current automated baseline:
 
-- 13 tests across unit, Git, JSON-RPC, runtime, and full mock-pipeline coverage;
-- approximately 81% line coverage on the tested core;
-- successful TypeScript build and pnpm package dry run.
+- formatting, typechecking, linting, test coverage, and TypeScript build;
+- package-content verification with the repository's pinned pnpm version.
 
 Tests include:
 
@@ -177,21 +176,11 @@ Tests include:
 - App Server JSON-RPC integration against a mock subprocess;
 - Git precondition and checkpoint commit behavior.
 
-## Codex Skill
+## TODO
 
-The repo includes an explicit-only skill at:
-
-```text
-.agents/skills/pre2prod/
-```
-
-Invoke it in Codex with:
-
-```text
-$pre2prod
-```
-
-The skill only launches the CLI; it does not duplicate the workflow.
+- [ ] Create and package an explicit-only Codex skill at
+      `.agents/skills/pre2prod/`. It should launch the CLI without duplicating
+      the workflow.
 
 ## Run `pre2prod` from any project
 
