@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const mockServer = resolve(here, "fixtures/mock-app-server.mjs");
 
 describe("AppServerRuntime", () => {
-  it("starts, forks, and runs read/write turns", async () => {
+  it("supports thread lifecycle, turns, and goal operations", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-runtime-"));
     const runtime = new AppServerRuntime({
       command: process.execPath,
@@ -24,6 +24,16 @@ describe("AppServerRuntime", () => {
     await runtime.initialize();
     try {
       const reviewer = await runtime.startThread({ cwd });
+      const reviewGoal = await runtime.setThreadGoal(reviewer.id, {
+        objective: "initial review",
+        status: "active",
+      });
+      expect(reviewGoal.threadId).toBe(reviewer.id);
+      expect(reviewGoal.objective).toBe("initial review");
+
+      const fetchedReviewGoal = await runtime.getThreadGoal(reviewer.id);
+      expect(fetchedReviewGoal).toEqual(reviewGoal);
+
       const review = await runtime.runTurn({
         threadId: reviewer.id,
         prompt: "review",
@@ -34,6 +44,13 @@ describe("AppServerRuntime", () => {
       expect(review.text).toContain('"NEEDS_WORK"');
 
       const worker = await runtime.forkThread(reviewer.id, review.turnId);
+      const planGoal = await runtime.setThreadGoal(worker.id, {
+        objective: "plan",
+        status: "active",
+      });
+      expect(planGoal.threadId).toBe(worker.id);
+      expect(await runtime.getThreadGoal(worker.id)).toEqual(planGoal);
+
       await runtime.runTurn({
         threadId: worker.id,
         prompt: "write a complete, minimal, executable remediation plan",
@@ -46,9 +63,15 @@ describe("AppServerRuntime", () => {
         cwd,
         sandbox: "workspaceWrite",
       });
+      expect(await runtime.clearThreadGoal(worker.id)).toBe(true);
 
-      expect(await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8")).toContain("# Plan");
-      expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe("fixed\n");
+      expect(
+        await readFile(resolve(cwd, "PRE2PROD_PLAN.md"), "utf8"),
+      ).toContain("# Plan");
+      expect(await readFile(resolve(cwd, "mock-fixed.txt"), "utf8")).toBe(
+        "fixed\n",
+      );
+      expect(await runtime.clearThreadGoal(reviewer.id)).toBe(true);
     } finally {
       await runtime.close();
     }

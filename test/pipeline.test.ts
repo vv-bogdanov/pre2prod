@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import type {
   AgentRuntime,
   Phase,
+  ThreadGoal,
+  ThreadGoalRequest,
   ProgressReporter,
   ThreadRef,
   TurnRequest,
@@ -40,8 +42,12 @@ describe("Pre2prodPipeline", () => {
       networkAccess: false,
     });
 
-    expect(result.phases).toEqual([{ phase, iterations: 1, passed: true, findings: [] }]);
-    expect(runtime.forks).toEqual([{ threadId: "reviewer", lastTurnId: "turn-2" }]);
+    expect(result.phases).toEqual([
+      { phase, iterations: 1, passed: true, findings: [] },
+    ]);
+    expect(runtime.forks).toEqual([
+      { threadId: "reviewer", lastTurnId: "turn-2" },
+    ]);
     expect(runtime.requests.map((request) => request.threadId)).toEqual([
       "reviewer",
       "reviewer",
@@ -49,11 +55,51 @@ describe("Pre2prodPipeline", () => {
       "worker-1",
       "reviewer",
     ]);
+    expect(runtime.goals).toEqual([
+      {
+        action: "set",
+        threadId: "reviewer",
+        payload: {
+          objective: "Testing review (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "reviewer", payload: undefined },
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing worker planning (iteration 1)",
+          status: "active",
+        },
+      },
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing worker execution (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "worker-1", payload: undefined },
+      {
+        action: "set",
+        threadId: "reviewer",
+        payload: {
+          objective: "Testing review (iteration 2)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "reviewer", payload: undefined },
+    ]);
   });
 
   it("skips worker when a phase passes immediately", async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), "pre2prod-pipeline-"));
-    const runtime = new FakeRuntime(cwd, ["Repository summary", '{"status":"PASS","findings":[]}']);
+    const runtime = new FakeRuntime(cwd, [
+      "Repository summary",
+      '{"status":"PASS","findings":[]}',
+    ]);
     const pipeline = new Pre2prodPipeline(runtime, silentReporter(), [phase]);
 
     const result = await pipeline.run({
@@ -64,6 +110,17 @@ describe("Pre2prodPipeline", () => {
 
     expect(result.phases[0]?.iterations).toBe(0);
     expect(runtime.forks).toHaveLength(0);
+    expect(runtime.goals).toEqual([
+      {
+        action: "set",
+        threadId: "reviewer",
+        payload: {
+          objective: "Testing review (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "reviewer", payload: undefined },
+    ]);
   });
 
   it("fails when the planning turn does not create PRE2PROD_PLAN.md", async () => {
@@ -82,6 +139,26 @@ describe("Pre2prodPipeline", () => {
     await expect(
       pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
     ).rejects.toThrow(/did not create PRE2PROD_PLAN.md/i);
+    expect(runtime.goals).toEqual([
+      {
+        action: "set",
+        threadId: "reviewer",
+        payload: {
+          objective: "Testing review (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "reviewer", payload: undefined },
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing worker planning (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "worker-1", payload: undefined },
+    ]);
   });
 
   it("stops after the iteration limit", async () => {
@@ -98,17 +175,60 @@ describe("Pre2prodPipeline", () => {
     await expect(
       pipeline.run({ cwd, maxIterationsPerPhase: 1, networkAccess: false }),
     ).rejects.toBeInstanceOf(PhaseFailedError);
+    expect(runtime.goals).toEqual([
+      {
+        action: "set",
+        threadId: "reviewer",
+        payload: {
+          objective: "Testing review (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "reviewer", payload: undefined },
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing worker planning (iteration 1)",
+          status: "active",
+        },
+      },
+      {
+        action: "set",
+        threadId: "worker-1",
+        payload: {
+          objective: "Testing worker execution (iteration 1)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "worker-1", payload: undefined },
+      {
+        action: "set",
+        threadId: "reviewer",
+        payload: {
+          objective: "Testing review (iteration 2)",
+          status: "active",
+        },
+      },
+      { action: "clear", threadId: "reviewer", payload: undefined },
+    ]);
   });
 });
 
 class FakeRuntime implements AgentRuntime {
   readonly requests: TurnRequest[] = [];
   readonly forks: Array<{ threadId: string; lastTurnId: string }> = [];
+  readonly goals: Array<{
+    action: "set" | "get" | "clear";
+    threadId: string;
+    payload: ThreadGoalRequest | undefined;
+  }> = [];
   readonly #cwd: string;
   readonly #responses: string[];
   readonly #writePlan: boolean;
   #turn = 0;
   #worker = 0;
+  #goalStorage = new Map<string, ThreadGoal>();
 
   public constructor(cwd: string, responses: string[], writePlan = true) {
     this.#cwd = cwd;
@@ -122,7 +242,10 @@ class FakeRuntime implements AgentRuntime {
     return { id: "reviewer" };
   }
 
-  public async forkThread(threadId: string, lastTurnId: string): Promise<ThreadRef> {
+  public async forkThread(
+    threadId: string,
+    lastTurnId: string,
+  ): Promise<ThreadRef> {
     this.forks.push({ threadId, lastTurnId });
     return { id: `worker-${++this.#worker}` };
   }
@@ -135,11 +258,46 @@ class FakeRuntime implements AgentRuntime {
     }
     if (
       this.#writePlan &&
-      request.prompt.includes("write a complete, minimal, executable remediation plan")
+      request.prompt.includes(
+        "write a complete, minimal, executable remediation plan",
+      )
     ) {
-      await writeFile(resolve(this.#cwd, "PRE2PROD_PLAN.md"), "# Test plan\n", "utf8");
+      await writeFile(
+        resolve(this.#cwd, "PRE2PROD_PLAN.md"),
+        "# Test plan\n",
+        "utf8",
+      );
     }
     return { turnId: `turn-${++this.#turn}`, status: "completed", text };
+  }
+
+  public async setThreadGoal(
+    threadId: string,
+    goal: ThreadGoalRequest,
+  ): Promise<ThreadGoal> {
+    this.goals.push({ action: "set", threadId, payload: goal });
+    const threadGoal: ThreadGoal = {
+      threadId,
+      objective: goal.objective ?? "objective",
+      status: goal.status ?? "active",
+      tokenBudget: goal.tokenBudget ?? null,
+      tokensUsed: 0,
+      timeUsedSeconds: 0,
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    this.#goalStorage.set(threadId, threadGoal);
+    return threadGoal;
+  }
+
+  public async getThreadGoal(threadId: string): Promise<ThreadGoal | null> {
+    this.goals.push({ action: "get", threadId, payload: undefined });
+    return this.#goalStorage.get(threadId) ?? null;
+  }
+
+  public async clearThreadGoal(threadId: string): Promise<boolean> {
+    this.goals.push({ action: "clear", threadId, payload: undefined });
+    return this.#goalStorage.delete(threadId);
   }
 
   public async close(): Promise<void> {}
