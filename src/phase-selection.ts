@@ -99,7 +99,7 @@ export function formatPhaseList(
     }
     isFirstGroup = false;
 
-    output.push(group);
+    output.push(pc.bold(group));
 
     values.forEach(({ phase, displayTitle }) => {
       const paddedTitle = `${displayTitle}`.padEnd(maxTitleLength);
