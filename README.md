@@ -87,6 +87,23 @@ Options:
   --verbose                   show streamed model and command details
 ```
 
+`pre2prod logs` reads run logs in `.pre2prod/logs` (or `--log-dir` override):
+
+```text
+pre2prod logs [options]
+
+Options:
+  --full                     Read full event log instead of summary log
+  -r, --run-id <id>          Filter by run id (exact)
+  -p, --phase-id <id>        Filter by phase id (substring)
+  -i, --iteration <number>   Filter by phase iteration
+  -R, --role <role>          Filter by thread role: reviewer|worker
+  -t, --turn <turn>          Filter by phase turn: review|planning|execution
+  -e, --event <event>        Filter by event name
+  -c, --contains <text>      Filter by text in raw log line
+  -T, --tag <tag>            Filter by text in contextTag
+```
+
 Examples:
 
 ```bash
@@ -113,6 +130,10 @@ Foundation
   Reproducible Local Run      foundation-reproducible-local-run
   Core Scope & Critical Journeys foundation-core-scope-critical-journeys
   Critical Smoke Baseline      foundation-critical-smoke-baseline
+
+# quick grep-like log checks
+pre2prod logs --event phase.review.blockers --phase-id architecture
+pre2prod logs --full --tag p=3/12 --run-id 2026-07-21-...
 ```
 
 ## Development
