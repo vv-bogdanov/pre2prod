@@ -62,7 +62,7 @@ art for its MVP scope.
 ### Foundation
 
 - [x] `foundation-immediate-risk-triage` — Immediate Risk Triage
-- [ ] `foundation-reproducible-local-run` — Reproducible Local Run
+- [x] `foundation-reproducible-local-run` — Reproducible Local Run
 - [ ] `foundation-core-scope-critical-journeys` — Core Scope & Critical Journeys
 - [ ] `foundation-critical-smoke-baseline` — Critical Smoke Baseline
 
