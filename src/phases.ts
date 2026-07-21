@@ -8,15 +8,21 @@ import { parse } from "yaml";
 import { Pre2prodError } from "./core/errors.js";
 import type { Phase } from "./core/types.js";
 
-const INTERNAL_PHASES_PATH = fileURLToPath(new URL("../resources/phases.yaml", import.meta.url));
+const INTERNAL_PHASES_PATH = fileURLToPath(
+  new URL("../resources/phases.yaml", import.meta.url),
+);
 
 export async function loadPhases(cwd: string): Promise<readonly Phase[]> {
-  const fromProject = await tryLoadPhases(resolve(cwd, ".pre2prod", "phases.yaml"));
+  const fromProject = await tryLoadPhases(
+    resolve(cwd, ".pre2prod", "phases.yaml"),
+  );
   if (fromProject !== undefined) {
     return fromProject;
   }
 
-  const fromHome = await tryLoadPhases(resolve(homedir(), ".pre2prod", "phases.yaml"));
+  const fromHome = await tryLoadPhases(
+    resolve(homedir(), ".pre2prod", "phases.yaml"),
+  );
   if (fromHome !== undefined) {
     return fromHome;
   }
@@ -24,7 +30,9 @@ export async function loadPhases(cwd: string): Promise<readonly Phase[]> {
   return loadPhasesFromFile(INTERNAL_PHASES_PATH, new Set());
 }
 
-async function tryLoadPhases(path: string): Promise<readonly Phase[] | undefined> {
+async function tryLoadPhases(
+  path: string,
+): Promise<readonly Phase[] | undefined> {
   try {
     return await loadPhasesFromFile(path, new Set());
   } catch (error) {
@@ -35,7 +43,10 @@ async function tryLoadPhases(path: string): Promise<readonly Phase[] | undefined
   }
 }
 
-async function loadPhasesFromFile(path: string, stack: Set<string>): Promise<readonly Phase[]> {
+async function loadPhasesFromFile(
+  path: string,
+  stack: Set<string>,
+): Promise<readonly Phase[]> {
   const absolutePath = resolve(path);
   if (stack.has(absolutePath)) {
     throw new Pre2prodError(
@@ -53,14 +64,18 @@ async function loadPhasesFromFile(path: string, stack: Set<string>): Promise<rea
       if (isMissingFileError(error)) {
         throw error;
       }
-      throw new Pre2prodError(`Failed to read phase config ${absolutePath}`, { cause: error });
+      throw new Pre2prodError(`Failed to read phase config ${absolutePath}`, {
+        cause: error,
+      });
     }
 
     let parsed: unknown;
     try {
       parsed = parse(rawContent);
     } catch (error) {
-      throw new Pre2prodError(`Failed to parse YAML in ${absolutePath}`, { cause: error });
+      throw new Pre2prodError(`Failed to parse YAML in ${absolutePath}`, {
+        cause: error,
+      });
     }
 
     const document = parsePhaseDocument(parsed, absolutePath);
@@ -87,7 +102,9 @@ async function loadPhasesFromFile(path: string, stack: Set<string>): Promise<rea
 
 function parsePhaseDocument(raw: unknown, path: string): PhaseConfig {
   if (raw === null || raw === undefined) {
-    throw new Pre2prodError(`Invalid phase document in ${path}: expected an object or an array`);
+    throw new Pre2prodError(
+      `Invalid phase document in ${path}: expected an object or an array`,
+    );
   }
 
   if (Array.isArray(raw)) {
@@ -95,11 +112,15 @@ function parsePhaseDocument(raw: unknown, path: string): PhaseConfig {
   }
 
   if (!isRecord(raw)) {
-    throw new Pre2prodError(`Invalid phase document in ${path}: expected an object or an array`);
+    throw new Pre2prodError(
+      `Invalid phase document in ${path}: expected an object or an array`,
+    );
   }
 
   const include = parseInclude(raw.include, path);
-  const phases = parsePhases(raw.phases, path, "phases");
+  const phasesFromList = parsePhases(raw.phases, path, "phases");
+  const phasesFromMap = parsePhaseRecords(raw, path, "root object");
+  const phases = mergePhases(phasesFromList, phasesFromMap);
   return { include, phases };
 }
 
@@ -124,25 +145,44 @@ function parseInclude(rawInclude: unknown, path: string): readonly string[] {
     return includes;
   }
 
-  throw new Pre2prodError(`Invalid include in ${path}; expected a string or list of strings`);
+  throw new Pre2prodError(
+    `Invalid include in ${path}; expected a string or list of strings`,
+  );
 }
 
-function parsePhases(rawPhases: unknown, path: string, propertyPath: string): readonly Phase[] {
+function parsePhases(
+  rawPhases: unknown,
+  path: string,
+  propertyPath: string,
+): readonly Phase[] {
   if (rawPhases === undefined) {
     return [];
   }
 
   if (!Array.isArray(rawPhases)) {
-    throw new Pre2prodError(`Invalid ${propertyPath} in ${path}; expected a list of phases`);
+    throw new Pre2prodError(
+      `Invalid ${propertyPath} in ${path}; expected a list of phases`,
+    );
   }
 
   return rawPhases.map((rawPhase, index) => {
     if (!isRecord(rawPhase)) {
-      throw new Pre2prodError(`Invalid phase at ${propertyPath}[${index}] in ${path}; expected an object`);
+      throw new Pre2prodError(
+        `Invalid phase at ${propertyPath}[${index}] in ${path}; expected an object`,
+      );
     }
 
-    const id = toNonEmptyString(rawPhase.id, `${propertyPath}[${index}].id`, path);
-    const title = toNonEmptyString(rawPhase.title, `${propertyPath}[${index}].title`, path);
+    const title = toNonEmptyString(
+      rawPhase.title,
+      `${propertyPath}[${index}].title`,
+      path,
+    );
+    const id = extractPhaseId(
+      rawPhase,
+      `${propertyPath}[${index}]`,
+      path,
+      title,
+    );
     const reviewerPrompt = toNonEmptyString(
       rawPhase.reviewerPrompt,
       `${propertyPath}[${index}].reviewerPrompt`,
@@ -153,15 +193,107 @@ function parsePhases(rawPhases: unknown, path: string, propertyPath: string): re
   });
 }
 
-function toNonEmptyString(value: unknown, fieldPath: string, sourcePath: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Pre2prodError(`Invalid ${fieldPath} in ${sourcePath}; expected a non-empty string`);
-  }
+function parsePhaseRecords(
+  raw: Record<string, unknown>,
+  path: string,
+  propertyPath: string,
+): readonly Phase[] {
+  const phases: Phase[] = [];
+  for (const [phaseId, phaseConfig] of Object.entries(raw)) {
+    if (phaseId === "include" || phaseId === "phases") {
+      continue;
+    }
 
-  return value;
+    const id = toPhaseId(phaseId);
+    const titleFromKey = slugToTitle(phaseId);
+    if (typeof phaseConfig === "string") {
+      const reviewerPrompt = toNonEmptyString(
+        phaseConfig,
+        `${propertyPath}.${phaseId}.reviewerPrompt`,
+        path,
+      );
+      phases.push({
+        id,
+        title: titleFromKey,
+        reviewerPrompt,
+      });
+      continue;
+    }
+
+    if (!isRecord(phaseConfig)) {
+      throw new Pre2prodError(
+        `Invalid phase at ${propertyPath}.${phaseId} in ${path}; expected an object or string`,
+      );
+    }
+
+    const title = phaseConfig.title
+      ? toNonEmptyString(
+          phaseConfig.title,
+          `${propertyPath}.${phaseId}.title`,
+          path,
+        )
+      : titleFromKey;
+    const reviewerPrompt = toNonEmptyString(
+      phaseConfig.reviewerPrompt,
+      `${propertyPath}.${phaseId}.reviewerPrompt`,
+      path,
+    );
+    phases.push({ id, title, reviewerPrompt });
+  }
+  return phases;
 }
 
-function mergePhases(base: readonly Phase[], override: readonly Phase[]): Phase[] {
+function toNonEmptyString(
+  value: unknown,
+  fieldPath: string,
+  sourcePath: string,
+): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Pre2prodError(
+      `Invalid ${fieldPath} in ${sourcePath}; expected a non-empty string`,
+    );
+  }
+
+  return value.trim();
+}
+
+function extractPhaseId(
+  rawPhase: Record<string, unknown>,
+  propertyPath: string,
+  sourcePath: string,
+  title: string,
+): string {
+  const rawId = rawPhase.id;
+  if (rawId === undefined) {
+    return toPhaseId(title);
+  }
+  return toNonEmptyString(rawId, `${propertyPath}.id`, sourcePath);
+}
+
+function toPhaseId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/["'`]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function slugToTitle(value: string): string {
+  return value
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .split(" ")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`)
+    .join(" ");
+}
+
+function mergePhases(
+  base: readonly Phase[],
+  override: readonly Phase[],
+): Phase[] {
   const merged = [...base];
 
   for (const phase of override) {

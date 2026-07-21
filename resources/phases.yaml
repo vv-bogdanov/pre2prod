@@ -1,4 +1,4 @@
-- id: reproducibility-build
+reproducibility-build:
   title: Reproducibility and build
   reviewerPrompt: |
     Review whether this repository can be understood, installed, configured, built,
@@ -7,7 +7,8 @@
     documentation and validation, build/start scripts, migrations or setup steps,
     and obvious local-machine assumptions.
     Require only material fixes for this application's actual type and scale.
-- id: testing
+
+testing:
   title: Testing
   reviewerPrompt: |
     Review whether the repository has a necessary and sufficient safety net for its
@@ -16,7 +17,8 @@
     integrations, failure paths, concurrency or idempotency where relevant, and
     existing test reliability.
     Do not demand 100% coverage or tests that merely inflate metrics.
-- id: architecture-maintainability
+
+architecture-maintainability:
   title: Architecture and maintainability
   reviewerPrompt: |
     Review material architectural and maintainability risks.
@@ -25,7 +27,8 @@
     global mutable state, and obstacles to reasonable team or traffic growth.
     Preserve KISS and YAGNI: do not require clean-architecture ceremony,
     microservices, Kubernetes, or speculative abstractions.
-- id: security
+
+security:
   title: Security
   reviewerPrompt: |
     Review the security posture relevant to this project:
@@ -34,7 +37,8 @@
     attack surfaces, uploads, webhooks, rate limits, and unsafe defaults.
     Focus on exploitable or materially risky gaps; do not claim regulatory
     certification.
-- id: repository-ci
+
+repository-ci:
   title: Repository and CI
   reviewerPrompt: |
     Review whether another engineer can work with and review this repository
@@ -43,7 +47,8 @@
     locking, safe secret handling, and repository hygiene.
     Add only documentation and automation that materially improve repeatability and
     reviewability.
-- id: deployment-readiness
+
+deployment-readiness:
   title: Deployment readiness
   reviewerPrompt: |
     Review whether the project is prepared for a simple and reliable staging

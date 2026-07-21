@@ -12,7 +12,9 @@ describe("loadPhases", () => {
   const originalHome = process.env.HOME;
 
   afterEach(async () => {
-    await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+    await Promise.all(
+      tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+    );
     tempDirs.length = 0;
     if (originalHome === undefined) {
       delete process.env.HOME;
@@ -32,25 +34,70 @@ describe("loadPhases", () => {
     const cwd = await newTempDir("pre2prod-phases-project-");
     const homeDir = await newTempDir("pre2prod-phases-home-");
 
-    await writePhaseFile(resolve(cwd, ".pre2prod", "phases.yaml"), projectPhaseYaml("project"));
-    await writePhaseFile(resolve(homeDir, ".pre2prod", "phases.yaml"), projectPhaseYaml("home"));
+    await writePhaseFile(
+      resolve(cwd, ".pre2prod", "phases.yaml"),
+      projectPhaseYaml("project"),
+    );
+    await writePhaseFile(
+      resolve(homeDir, ".pre2prod", "phases.yaml"),
+      projectPhaseYaml("home"),
+    );
     process.env.HOME = homeDir;
 
     const phases = await loadPhases(cwd);
 
-    expect(phases).toEqual([{ id: "project", title: "Project", reviewerPrompt: "From project" }]);
+    expect(phases).toEqual([
+      { id: "project", title: "Project", reviewerPrompt: "From project" },
+    ]);
+  });
+
+  it("supports kv format and infers ids by key/title", async () => {
+    const cwd = await newTempDir("pre2prod-phases-kv-");
+    const projectConfig =
+      "security:\n" +
+      "  title: Security\n" +
+      "  reviewerPrompt: |\n" +
+      "    Validate authentication and data handling\n" +
+      "reproducibility-build:\n" +
+      "  reviewerPrompt: |\n" +
+      "    Validate build and packaging flow\n";
+
+    await writePhaseFile(
+      resolve(cwd, ".pre2prod", "phases.yaml"),
+      projectConfig,
+    );
+
+    const phases = await loadPhases(cwd);
+
+    expect(phases).toEqual([
+      {
+        id: "security",
+        title: "Security",
+        reviewerPrompt: "Validate authentication and data handling",
+      },
+      {
+        id: "reproducibility-build",
+        title: "Reproducibility Build",
+        reviewerPrompt: "Validate build and packaging flow",
+      },
+    ]);
   });
 
   it("falls back to home when project is missing", async () => {
     const cwd = await newTempDir("pre2prod-phases-home-only-");
     const homeDir = await newTempDir("pre2prod-phases-home-only2-");
 
-    await writePhaseFile(resolve(homeDir, ".pre2prod", "phases.yaml"), projectPhaseYaml("home"));
+    await writePhaseFile(
+      resolve(homeDir, ".pre2prod", "phases.yaml"),
+      projectPhaseYaml("home"),
+    );
     process.env.HOME = homeDir;
 
     const phases = await loadPhases(cwd);
 
-    expect(phases).toEqual([{ id: "home", title: "Home", reviewerPrompt: "From home" }]);
+    expect(phases).toEqual([
+      { id: "home", title: "Home", reviewerPrompt: "From home" },
+    ]);
   });
 
   it("falls back to embedded phases when project and home are missing", async () => {
@@ -74,13 +121,23 @@ describe("loadPhases", () => {
       "  - id: base\n    title: Base overridden\n    reviewerPrompt: Local override\n" +
       "  - id: local\n    title: Local\n    reviewerPrompt: Local only\n";
 
-    await writePhaseFile(basePath, "phases:\n  - id: base\n    title: Base\n    reviewerPrompt: Base phase\n");
-    await writePhaseFile(resolve(cwd, ".pre2prod", "phases.yaml"), projectConfig);
+    await writePhaseFile(
+      basePath,
+      "phases:\n  - id: base\n    title: Base\n    reviewerPrompt: Base phase\n",
+    );
+    await writePhaseFile(
+      resolve(cwd, ".pre2prod", "phases.yaml"),
+      projectConfig,
+    );
 
     const phases = await loadPhases(cwd);
 
     expect(phases).toEqual([
-      { id: "base", title: "Base overridden", reviewerPrompt: "Local override" },
+      {
+        id: "base",
+        title: "Base overridden",
+        reviewerPrompt: "Local override",
+      },
       { id: "local", title: "Local", reviewerPrompt: "Local only" },
     ]);
   });
@@ -92,8 +149,14 @@ describe("loadPhases", () => {
     const includeB = resolve(cwd, ".pre2prod", "b.yaml");
 
     await writePhaseFile(top, "include:\n  - ./a.yaml\n");
-    await writePhaseFile(includeA, "include:\n  - ./b.yaml\nphases:\n  - id: a\n    title: A\n    reviewerPrompt: from a\n");
-    await writePhaseFile(includeB, "include:\n  - ./a.yaml\nphases:\n  - id: b\n    title: B\n    reviewerPrompt: from b\n");
+    await writePhaseFile(
+      includeA,
+      "include:\n  - ./b.yaml\nphases:\n  - id: a\n    title: A\n    reviewerPrompt: from a\n",
+    );
+    await writePhaseFile(
+      includeB,
+      "include:\n  - ./a.yaml\nphases:\n  - id: b\n    title: B\n    reviewerPrompt: from b\n",
+    );
 
     await expect(loadPhases(cwd)).rejects.toThrow(/circular/i);
   });
@@ -101,7 +164,10 @@ describe("loadPhases", () => {
   it("fails when yaml cannot be parsed", async () => {
     const cwd = await newTempDir("pre2prod-phases-parse-error-");
 
-    await writePhaseFile(resolve(cwd, ".pre2prod", "phases.yaml"), "phases: [ [\n");
+    await writePhaseFile(
+      resolve(cwd, ".pre2prod", "phases.yaml"),
+      "phases: [ [\n",
+    );
 
     await expect(loadPhases(cwd)).rejects.toThrow(Pre2prodError);
   });
