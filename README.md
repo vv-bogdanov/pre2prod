@@ -51,7 +51,7 @@ npx --yes pre2prod \
 
 ## Demo
 
-[Watch the demo on YouTube](YOUTUBE_URL)
+[Watch the demo on YouTube](https://youtu.be/SLOTY3L9PTE)
 
 This is Pre2Prod running on its own repository. The video shows the real
 workflow starting and moving through its reviews.
