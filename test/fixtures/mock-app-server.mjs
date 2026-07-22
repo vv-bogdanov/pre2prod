@@ -11,9 +11,6 @@ let turnCounter = 0;
 const goals = new Map();
 const now = () => Math.floor(Date.now() / 1000);
 
-if (process.env.MOCK_PID_FILE) {
-  await writeFile(process.env.MOCK_PID_FILE, `${process.pid}\n`, "utf8");
-}
 if (process.env.MOCK_EXIT_FILE) {
   const markExited = () => {
     writeFileSync(process.env.MOCK_EXIT_FILE, `${process.pid}\n`, "utf8");
@@ -26,6 +23,9 @@ if (process.env.MOCK_EXIT_FILE) {
     markExited();
     process.exit(0);
   });
+}
+if (process.env.MOCK_PID_FILE) {
+  await writeFile(process.env.MOCK_PID_FILE, `${process.pid}\n`, "utf8");
 }
 
 function send(message) {
