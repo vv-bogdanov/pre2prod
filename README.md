@@ -6,7 +6,7 @@
 
 ## The missing second half of vibe coding
 
-**From a working PoC to a production-ready MVP.**
+**From a vibecoded PoC to a production-ready MVP.**
 
 Thousands of products are vibe-coded every day. Only a small fraction make it
 to production.
