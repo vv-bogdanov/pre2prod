@@ -1,6 +1,6 @@
 {
   "name": "pre2prod",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reviewer-led CLI that prepares existing repositories for staging and production-oriented use.",
   "homepage": "https://github.com/vv-bogdanov/pre2prod#readme",
   "repository": {
