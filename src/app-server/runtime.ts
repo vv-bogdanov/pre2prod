@@ -15,6 +15,7 @@ import {
   type JsonRpcClientOptions,
 } from "./json-rpc-client.js";
 import type { RunLogger } from "../logging.js";
+import { VERSION } from "../version.js";
 
 interface ThreadResponse {
   thread: {
@@ -88,7 +89,7 @@ export class AppServerRuntime implements AgentRuntime {
     this.#reporter = options.reporter;
     this.#model = options.model;
     this.#modelProvider = options.modelProvider;
-    this.#clientVersion = options.clientVersion ?? "0.1.0";
+    this.#clientVersion = options.clientVersion ?? VERSION;
     this.#logger = options.logger;
     this.#turnTimeoutMs = options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS;
     this.#client = new JsonRpcProcessClient(options);

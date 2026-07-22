@@ -11,8 +11,8 @@ candidate; there is no service deployment, migration, or container image.
 4. Inspect `.pre2prod/pack-check/pre2prod-<version>.tgz` and its file list.
 5. Complete the live checks in `docs/LIVE_COMPATIBILITY_CHECKLIST.md` against
    the exact supported Codex CLI before a public release.
-6. Update the version with the repository's normal SemVer review and commit the
-   version change.
+6. Run `npm version <version> --no-git-tag-version` and commit the version
+   change. `package.json` is the single version source for the package and CLI.
 
 `release:check` validates source, audits production dependencies, packs without
 rerunning lifecycle scripts, installs the tarball into a fresh temporary

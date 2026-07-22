@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 
 import { AppServerRuntime } from "./app-server/runtime.js";
 import { parseReviewResult, REVIEW_RESULT_SCHEMA } from "./reviewer.js";
+import { VERSION } from "./version.js";
 
 export interface DoctorOptions {
   cwd: string;
@@ -136,7 +137,7 @@ async function checkAppServer(options: DoctorOptions): Promise<DoctorCheck> {
     cwd: options.cwd,
     ...(options.model ? { model: options.model } : {}),
     ...(options.provider ? { modelProvider: options.provider } : {}),
-    clientVersion: options.clientVersion ?? "0.1.0",
+    clientVersion: options.clientVersion ?? VERSION,
     turnTimeoutMs: HANDSHAKE_TIMEOUT_MS,
   });
 

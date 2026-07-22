@@ -16,13 +16,13 @@ import { createRunId, FileRunLogger, redactSensitiveText } from "./logging.js";
 import { resolveRuntimeConfig } from "./runtime-config.js";
 import { buildLogStats, formatLogStats } from "./log-stats.js";
 import { runDoctor } from "./doctor.js";
+import { VERSION } from "./version.js";
 import {
   collectPhaseIds,
   formatPhaseList,
   selectPhases,
 } from "./phase-selection.js";
 
-const VERSION = "0.1.0";
 const program = new Command();
 
 program
